@@ -79,7 +79,7 @@ argocd-image-updater.argoproj.io/write-back-method: git:secret:argocd/git-creds
 4.create the secret for git.
 kubectl -n argocd create secret generic git-creds \
   --from-literal=username=sriraju12 \
-  --from-literal=password=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
+  --from-literal=password=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sjkjsfkj
 
 the first 3 point need to add in the Annotations in application.
 if dockerhub repository is private then we need to create the secret for it to store the gockerhubcredential just like github.
