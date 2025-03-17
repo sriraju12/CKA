@@ -1,0 +1,2002 @@
+ETCD: 
+it is key value data store. The default port is 2379. in this port the ETCD will listen.
+whenever you want to get something from KUBECTL then those information will come from the ETCD.
+advertise-client-urls https://${INTERNAL_IP}:2379  --> this is where ETCD listen on.
+these information needs to pass to the KUBE API SERVER configuration,in order to store information.
+if you want to interact with the ETCD then you need to install the ETCDCTL.
+
+if you want to login into ETCD -> kubectl exec -it etcd -n kube-system
+
+for HA(High Availablity) in real time we have multiple master nodes. for example, we have 3 master nodes then automatically
+we have 3 ETCD. Make sure that in this ETCD instances know about each other by setting up the parameter in the ETCD
+service configuration i.e --initial-cluster controller-0=https://${CONTROLLER0_IP}:2380,controller-1=https://${CONTROLLER1_IP}:2380
+the above command to mention the different instances of ETCD.
+
+ETCDCTL can interact with ETCD Server using 2 API versions - Version 2 and Version 3.  By default its set
+to use Version 2. Each version has different sets of commands.
+
+For example ETCDCTL version 2 supports the following commands:
+
+etcdctl backup
+etcdctl cluster-health
+etcdctl mk
+etcdctl mkdir
+etcdctl set
+
+
+Whereas the commands are different in version 3
+
+etcdctl snapshot save 
+etcdctl endpoint health
+etcdctl get
+etcdctl put
+
+To set the right version of API set the environment variable ETCDCTL_API command
+
+export ETCDCTL_API=3
+
+
+
+When API version is not set, it is assumed to be set to version 2. And version 3 commands listed above don't work. 
+When API version is set to version 3, version 2 commands listed above don't work.
+
+
+
+Apart from that, you must also specify path to certificate files so that ETCDCTL can authenticate to the
+ETCD API Server. The certificate files are available in the etcd-master at the following path. 
+
+--cacert /etc/kubernetes/pki/etcd/ca.crt     
+--cert /etc/kubernetes/pki/etcd/server.crt     
+--key /etc/kubernetes/pki/etcd/server.key
+
+
+So for the commands I showed in the previous video to work you must specify the ETCDCTL API version and 
+path to certificate files. Below is the final form:
+
+kubectl exec etcd-master -n kube-system -- sh -c "ETCDCTL_API=3 etcdctl get / --prefix --keys-only --limit=10 --cacert /etc/kubernetes/pki/etcd/ca.crt --cert /etc/kubernetes/pki/etcd/server.crt  --key /etc/kubernetes/pki/etcd/server.key" 
+
+
+
+
+
+KUBE API SERVER:
+It handles all the requests.
+login into the api server and inside the pod, go to this location cat /etc/kubernetes/manifests.
+this is where all the kubernetes control planes manifests are present.
+
+-> kubectl exec -it name_of_the_API_SERVER -n kube-system -- /bin/bash
+
+
+KUBE CONTROLLER MANAGER:
+which is used to manage the inbulit controller such as replication controller, node controller etc. which ensures
+that the controller are running. It checks for every 5 secs.
+
+where we can see the configuration of this controller manager -> cat /etc/kubernetes/manifests/kube-controller-manager.yaml
+for this just login into that pods and go to this location.
+
+
+KUBE SCHEDULER:
+scheduler is used to schedule the pods. it decides which pods goes to the which node. it does not actually place
+the pod. that's the job of kubelet. kubelet is the one who creates and manages the pod.
+
+the scheduler decides the pods on which nodes it goes based on the resources requests and limits. so that it fit
+into that nodes.
+
+KUBELET:
+it is used to create and manages the pods.
+NOTE:
+if you use KUBEADM to create the cluster then kubelet by default it is not installed. you need to install it.
+
+
+
+KUBE PROXY:
+in kubernetes cluster every pod can reach to the another pod. this is accomplished by deploying pod networking solution in the cluster.
+web application in one node needs to access the database that is present in another node using by exposing
+the service of the database. so web application will access the service of database inorder to access the database.
+
+kube proxy is deployed via daemonsets in the cluster. -> kubectl get daemonsets -n kube-system
+
+POD:
+it is the smallest unit that can be deployed in kubernetes which contains the application.
+inside pod can have one or more container. only one main container is present remaining container are 
+helper or sidecar container which helps the main container.
+
+command to run the pod -> kubectl run nginx --image nginx
+
+sample POD yaml:
+
+apiVersion: v1
+kind: pod
+metadata:
+  name: nginxapp
+  labels:
+    app: my-nginxapp
+    type: front-end
+spec:
+  containers:
+    - name: nginx-container
+      image: nginx:latest
+
+it deploy it -> kubectl apply -f pod.yaml 
+it check more information about pod -> kubectl describe pod nginx-container
+
+
+
+REPLICA SETS:
+which is used to run the multiple pods for high Availablity.
+replication controller is old one and now it is replaced by replica sets.
+when you need to the repicas as 3 then it makes sure that 3 replicas of the pod should be running.
+basically it maintains the state between the running pod and the replicas that is mentioned in the deployment file.
+the difference between replication controller and replicaset is, in repicaset we need to include the selector field
+which does not required in replication controller.
+if any pod crashes or destroyed then it automatically creates the new pod.
+
+if you want to scale the replicaset -> kubectl scale --replicas=4 replicaset(type) replicaset-example(name of replicaset)
+
+replicasets.yaml:
+
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: replicaset-example
+  labels:
+    app: my-nginxapp
+    tier: front-end
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      name: my-nginxapp
+  template:
+    metadata:
+      name: my-nginxapp
+      labels:
+        app: my-nginxapp
+    spec:
+      containers:
+        - name: nginxapp
+          image: nginx
+
+
+
+
+DEPLOYMENT:   
+
+deploy.yml:
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deployment-example
+  labels:
+    app: my-nginxapp
+    tier: front-end
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      name: my-nginxapp
+  template:
+    metadata:
+      name: my-nginxapp
+      labels:
+        app: my-nginxapp
+    spec:
+      containers:
+        - name: nginxapp
+          image: nginx
+
+
+difference between deployment and replicasets:
+Deployment:
+Manages ReplicaSets and allows rolling updates, rollbacks, and scaling.
+Replicaset:
+Ensures a specified number of pod replicas are running.
+command to scale the deployment -> kubectl scale deployment(type) deployment-example(name of the deployment) --replicas=4
+if you want see all i.e pods, Deployment and replicasets -> kubectl get all
+
+
+
+
+SERVICES:
+services are used for communication between within the cluster and the outside world. services are used to
+connect one application to another i.e frontend needs to connect with backend.
+
+services are of 3 types: 1. clusterIp
+                         2. nodeport
+                         3. load balancer
+
+nodeport range is 30000 - 32767
+
+in the service yaml file: port is service port
+                          targetPort is application port
+                          nodeport is port where we need to access in the browser.
+
+in the ports section, only mandatory field is port(service port), if you don't mention targetPort then whatever mention
+in the port field that also matches to targetPort and for nodeport, it will automatically creates the nodeport
+within above range.
+
+for nodeport_service.yml:
+
+apiVersion: v1
+kind: service
+metadata:
+  name: myapp-service
+spec:
+  type: NodePort
+  selector:
+    app: my-nginxapp
+  ports:
+    - targetPort: 80
+      port: 80
+      nodePort: 30008
+
+NOTE:
+if you want to connect frontend pod to the backend pod then for frontend we can need to connect to the service of
+backend then when the request comes for services it will redirect to the pods of the backend.
+
+inorder to access the service, you need to give FQDN(Fully Qualified Domain Name)
+name_of_svc.namespace_name.svc.cluster.local
+
+for clusterIp_service.yml:
+
+apiVersion: v1
+kind: service
+metadata:
+  name: myapp-service
+spec:
+  type: ClusterIP
+  selector:
+    app: my-nginxapp
+  ports:
+    - targetPort: 80
+      port: 80
+      
+
+for loadBalancer_service.yml:
+
+apiVersion: v1
+kind: service
+metadata:
+  name: myapp-service
+spec:
+  type: LoadBalancer
+  selector:
+    app: my-nginxapp
+  ports:
+    - targetPort: 80
+      port: 80
+      nodePort: 30008
+
+
+
+NAMESPACES:
+it is used to logically isolate the group of resources into single unit.
+
+command to create: kubectl create namespace mydev(name of the namespace)
+to list namespaces -> kubectl get ns
+
+namespace.yml:
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mydev
+
+NOTE:
+if you want to create the resource in particular namespace then in that resource yml, inside the metadata just
+add the namespace field.
+
+if you want to switch to particular namespace permanently then use below command:
+kubectl config set-context $(kubectl config current-context) -n mydev
+
+
+RESOURCE QUOTA:
+it is the limit that can be applied to the namespace and that namespace should use only mentioned resources
+like CPU and RAM.
+
+A ResourceQuota in Kubernetes is used to limit the amount of resources (CPU, memory, pods, etc.) that
+a namespace can use. It helps prevent one team or application from consuming all cluster resources.
+
+resource_quota.yml:
+
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: my-quota
+  namespace: mydev  # Change to your namespace
+spec:
+  hard:
+    pods: "10"                    # Maximum 10 pods in the namespace
+    requests.cpu: "2"              # Total CPU request limit (2 cores)
+    requests.memory: "4Gi"         # Total memory request limit (4GB)
+    limits.cpu: "4"                # Total CPU limit (4 cores)
+    limits.memory: "8Gi"           # Total memory limit (8GB)
+
+NOTE:
+kubectl get pods --all-namespaces | grep blue -> command to check in which namespace this blue pod is present.
+
+
+
+IMPERATIVE VS DECLARATIVE:
+
+Imperative:
+it tells, what to do and how to do.
+example: if you want to go from one place to another place from cab. you tell car driver how to go to that place
+like directions i.e left, right.
+
+Declarative:
+you just booked cab from uber and mentioned the destination location and that's it. in this case, we are not 
+giving step by steps to reach the destination. it tells how to do instead of what to do.
+
+
+NOTE:
+difference between apply and create:
+
+create:
+if you create the yml file using kubectl create -f pod.yml then it will create the pod and if you want to edit file
+using kubectl replace -f pod.yml and then again applied the changes by creating it, it will throws an error like
+already exists.
+
+apply:
+where as in this case, when you edit the file and then you can apply the changes using kubectl apply -f pod.yml.
+it will update the object.it will not throw the error.
+if you deploy the resource through apply command then last made changes are stored in the kubernetes cluster 
+itself in the annotation section. for that describe on that particular resource.
+
+Imperative Commands:
+
+POD:
+Create an NGINX Pod
+
+kubectl run nginx --image=nginx
+
+Generate POD Manifest YAML file (-o yaml). Don't create it(--dry-run)
+
+kubectl run nginx --image=nginx --dry-run=client -o yaml
+
+
+
+Deployment:
+Create a deployment
+
+kubectl create deployment --image=nginx nginx
+
+Generate Deployment YAML file (-o yaml). Don't create it(--dry-run)
+
+kubectl create deployment --image=nginx nginx --dry-run=client -o yaml
+
+Generate Deployment with 4 Replicas
+
+kubectl create deployment nginx --image=nginx --replicas=4
+
+You can also scale a deployment using the kubectl scale command.
+
+kubectl scale deployment nginx --replicas=4
+
+Another way to do this is to save the YAML definition to a file and modify
+
+kubectl create deployment nginx --image=nginx --dry-run=client -o yaml > nginx-deployment.yaml
+
+You can then update the YAML file with the replicas or any other field before creating the deployment.
+
+
+
+Service:
+Create a Service named redis-service of type ClusterIP to expose pod redis on port 6379
+
+kubectl expose pod redis --port=6379 --name redis-service --dry-run=client -o yaml
+
+(This will automatically use the pod's labels as selectors)
+
+Or
+
+kubectl create service clusterip redis --tcp=6379:6379 --dry-run=client -o yaml (This will not use the pods labels as selectors, instead it will assume selectors as app=redis. You cannot pass in selectors as an option. So it does not work very well if your pod has a different label set. So generate the file and modify the selectors before creating the service)
+
+Create a Service named nginx of type NodePort to expose pod nginx's port 80 on port 30080 on the nodes:
+
+kubectl expose pod nginx --type=NodePort --port=80 --name=nginx-service --dry-run=client -o yaml
+
+(This will automatically use the pod's labels as selectors, but you cannot specify the node port. You have to generate a definition file and then add the node port in manually before creating the service with the pod.)
+
+Or
+
+kubectl create service nodeport nginx --tcp=80:80 --node-port=30080 --dry-run=client -o yaml
+
+(This will not use the pods labels as selectors)
+
+Both the above commands have their own challenges. While one of it cannot accept a selector the other cannot accept a node port. I would recommend going with the kubectl expose command. If you need to specify a node port, generate a definition file using the same command and manually input the nodeport before creating the service.
+
+
+
+MANUAL SCHEDULING:
+if you want to manually schedule the pods on the node then you need to add the field called nodeName. which is
+container level field.
+
+the scheduler only schedule the pods that does not have nodeName.
+
+
+LABELS AND SELECTORS:
+which is used to group the things together and filter them using different criteria.
+labels is used to give identification to it and selector is used to filter them.
+
+if you created a pod with label app: app1 and tier: frontend then you can filter it by using selector.
+--> kubectl get pods --selector app=app1
+
+kubectl get all --selector env=prod --no-headers | wc -l  -> it will give count.
+kubectl get all --selector env=prod,bu=finance,tier=frontend
+
+
+TAINTS AND TOLERATIONS:
+the bug and the person, if the bug wants to land on the person. the person is sprayed with foam(Taint) and the bug 
+does not tolerate that smell. so here bug can not land on the person. there are some bugs which can tolerate that
+smell(matching Toleration) can land on the person.
+
+taints and toleration, restrict the pods to schedule on the nodes.
+taints are set on the nodes and toleration is set on the pods.
+
+taint a node: kubectl taint nodes node_name key=value:taint_effect
+toleration: add the toleration at the container level in the pod.
+
+            tolerations:
+              - key: "app"
+                operator: "Equal"
+                value: "blue"
+                effect: "NoSchedule"
+
+taint_effect is, what would happen to pods if it does not tolerate the taint.
+
+taint effect is of three types: 1. NoSchedule - which is used to not schedule pods on this node.
+                                2. PreferNoSchedule - it is not guranteed to place the pod on this node or not.
+                                3. NoExecute - new pods will not schedule on the node and existing pods will evicted
+                                               if it does not have matching toleration.
+
+taints and tolerations are meant to restrict the nodes from accepting certain pods.
+taints and toleration does not tells a pod to go to particular node.
+
+kubectl describe node node01 | grep -i taints  -> to see whether the node is tainted or not.
+
+kubectl taint nodes controlplane node-role.kubernetes.io/control-plane:NoSchedule -> untaint the node
+
+NOTE:
+why no pod get schedule on the master node because while creating the cluster, the master nodes is tainted so no
+pods will schedule on the master node.
+
+
+
+
+NODE SELECTORS:
+for example, they are three nodes and one node is large one(high memory and cpu) and remaining two nodes are small.
+they are three pods and out of one is needs to run on the high resources node because if that pods have more resources 
+than expected then it can use them. to achieve this we need to use node selectors.
+
+first label the node and in the pod yml, container level we need include the field called nodeSelector: and mention the label.
+
+label name: kubectl label nodes node_name label_key=label_value.
+in pod:  nodeSelector:
+           size: Large
+
+the limitations of node selector is, if you have a requirement to place a pod on large or medium node or place A
+pod on any nodes but not on small etc. This is not be achieved using node selector. This can be achieved using node affinity.
+
+
+
+NODE AFFINITY:
+it is used to place the pods on particular nodes. It supports advanced capabilities like OR,NOT etc.
+
+node affinity in pod is a container level field:
+
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoreDuringExecution:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: size
+              operator: In
+              values:
+                - Large
+                - Medium     # to place a pod on large or medium node
+
+
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoreDuringExecution:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: size
+              operator: NotIn
+              values:
+                - Small  # place A pod on any nodes but not on small
+
+what if the node does not have the matching node affinity, will the pods get schedule or not.
+
+node affinity is of three types:
+
+1.requiredDuringSchedulingIgnoreDuringExecution - for this while creating the pod,pod must have matching label 
+                                                  with the node then only it will schedule it on the node.
+                                                  after placing in the node then you removed or chnaged the labels
+                                                  from node then it will not evict the pod. it will continue running in node.
+2.preferredDuringSchedulingIgnoreDuringExecution - for this while creating the pod, it will look for matching label
+                                                   if it is not found then it will schedule on other nodes.
+                                                   after placing in the node then you removed or chnaged the labels
+                                                  from node then it will not evict the pod. it will continue running in node.
+
+
+
+NOTE:
+in realtime, we use taints&toleration and node affinity as combined. to make sure that all the pods are schedule
+on the respective nodes instaed of scheduling on other nodes.
+
+
+
+RESOURCE REQUESTS AND LIMITS:
+requests is something like a pod can use minimum resources(Memory and Cpu) to run application.
+limits is something like a pod can use maximum resources(Memory and Cpu) to run application.
+
+resource requests and limits are pod level fields:
+
+resources:
+  requests:
+    memory: "2Gi"
+    cpu: 1
+  limits:
+    memory: "3Gi"
+    cpu: 2
+
+we can create the LimitRange resource yml and we can set resources requests and limits default to all the pods
+in a namespace. LimitRange is applied to namespace only.
+
+
+
+DAEMONSETS:
+when you deploy the daemonset then it will run one copy of the pod in every node in cluster.
+daemonset sures that one copy of the pod runs in every node.
+
+usecases:
+1. deploy the monitoring agents
+2. log collector
+3. we can deploy the kube-proxy as a daemonset, so that it will run on ever node in the cluster which actually
+   required for networking.
+
+   daemonsets.yaml:
+
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: my-daemonset
+  labels:
+    app: monitoring-agent
+    tier: front-end
+spec:
+  selector:
+    matchLabels:
+      app: monitoring-agent
+  template:
+    metadata:
+      name: my-nginxapp
+      labels:
+        app: monitoring-agent
+    spec:
+      containers:
+        - name: nginxapp
+          image: nginx
+
+
+
+STATIC PODS:
+kubelet is used to create and manage the pods. if you place the pod configuration files in this location
+/etc/kubernetes/manifests then kubelet watches this directory. if any new configuration is found then it 
+will create it.
+
+basically api server sends information to kubelet to create pod then kubelet creates it. 
+for control plane components pod configuration files are located at this location and without api server
+request, kubelet will create those configurations.
+
+control plane components are called static pods.
+
+difference between static pods and daemonsets:
+
+static pods:
+1.created by kubelet
+2.deploy control plane components as static pods
+3.ignored by kube scheduler
+
+daemonsets:
+1.created by kube-api-server(daemon-controller)
+2.deploy monitoring agents,logging agents on nodes
+3.ignored by kube scheduler
+
+kubectl get pods --all-namespaces | grep controlplane  -> to display static pods in all namespaces.
+
+Create a static pod named static-busybox that uses the busybox image and the command sleep 1000:
+kubectl run --restart=Never --image=busybox static-busybox --dry-run=client -o yaml --command -- sleep 1000 > /etc/kubernetes/manifests/static-busybox.yaml
+
+NOTE:
+if you have your own scheduler then in the pod configuration yaml file, in container level mention field called
+schedulerName.
+
+kubectl get events -o wide  -> to see the events of the current namespace.
+
+
+
+
+ADMISSION CONTROLLERS:
+in kubernetes, authentication is done using certificates.
+
+when you request to create the pod then that request goes to Api Server and then it will authenticate the request
+with certificate and then pod is created.
+
+Admission controller help us implementing better security measures to enforce how a cluster is used.
+
+some Admission controller are 1.AlwaysPullImages
+                              2.DefaultStorageClass
+                              3.NamespaceExists and etc.
+
+if you want to create a pod and then that request is authentication and then authorization and then it will
+goes to the Admission controller, it will check namespace is present then it will create the pod else it will
+throw an error.
+
+nameSpaceAutoProvision is a Admission controller that is not enabled by default. it is used to create the namespace
+if it is not present.
+
+to see Admission controller -> kube-apiserver -h | grep enable-admission-plugins
+
+if you want to enable it then in api server yml file configuration in admission-plugins, here you need to add
+nameSpaceAutoProvision.
+
+kubectl -> authentication -> authorization -> admission controller -> create resource.
+
+validating admission controllers are used to validate the requests.
+mutating admission controller are used to change the request.
+
+
+MONITORING KUBERNETES CLUSTER:
+
+what we need to monitor in kubernetes:
+1.node metrics - how many nodes are there, how many nodes are healthy etc.
+2.performance metrics - how much memory and cpu,network and disk utilization is used.
+3.pod level metrics - such as number of pods,performance metrics of each pod(cpu,memory)
+
+metrics servers collects the information from nodes, pods and stores them in inmemory i.e metrics server is a 
+inmemory monitoring solution. it does not store the data in disk.
+
+if you want metrics server then you need to install it and wait for some time to collect data and then run
+kubectl top node -> it will give the information of the nodes like cpu,memory
+kubectl top pod -> it will give the information of the pods like cpu,memory
+
+application logs -> if you want to see the application logs then
+kubectl logs name_of_the_container or pod -> to see the logs of the application.
+
+NOTE:
+if you want to see the metrics then you need to have metrics server then only top command will work.
+
+
+
+
+ROLLING UPDATES AND ROLLBACKS IN DEPLOYMENT:
+
+when you first create the deployment then it will first triggers a rollout and a new rollout will creates a revision for suppose revision 1
+when you change the Deployment image then it will trigger the rollout and the rollout will creates another revision for suppose revision 2.
+this help us to keep track of deployments changes to it and also enable us to rollback to previous revisions.
+
+if you want to see the status of rollout -> kubectl rollout status deployment my-deployment(name_of_deployment)
+if you want to see the rollout history -> kubectl rollout history deployment my-deployment
+
+deployment stratgies: to reduce the downtime, we will use deployment stratgies.
+deployment stratgies are when the deployment image changes then how new pods needs to be created.
+1.recreate: it will remove all the running pods and then it will create all the new pods. which causes a downtime to the application.
+2.rolling update: it is the default stratgies in deployment and it will destroy the 25 percent of the running application and it will 
+create the new pods,using this strategy, the downtime comes to almost zero. we can change the percent like how much percent of running
+pods needs to be destroyed and created.
+
+to rollback to the previous version of the deployment -> kubectl rollout undo deployment my-deployment
+
+NOTE:
+while creating the dockerfile, you have mention entrypoint["sleep"] and CMD["5"] and while running the docker container like
+docker run ubuntu-sleep 10 -> then it will override the value to 10. how to use this in pod in kubernetes.
+to pod configuration just add args: ["10"]. this is image level fields. This will do the same as docker command.
+
+if you want to override the entrypoint then in docker we need to pass as parameter like --entrypoint sleep2.0 and how to use
+this pod configuration. just add command which is image level field. and add command value i.e command: ["sleep2.0"]
+
+command will override the entrypoint value and args will override the CMD value in dockerfile.
+
+Create a pod with the ubuntu image to run a container to sleep for 5000 seconds:
+apiVersion: v1 
+kind: Pod 
+metadata:
+  name: ubuntu-sleeper-2 
+spec:
+  containers:
+  - name: ubuntu
+    image: ubuntu
+    command:
+      - "sleep"
+      - "5000"
+
+
+ENVIRONMENTAL VARIABLES:
+let's see how we can use environmental variables in pod. env is a image level field.
+
+env:
+  - name: color 
+    value: blue
+  - name: username
+    value: sriraju12
+
+CONFIGMAPS:
+which is used to store insensitive information. when the pod is created then configmaps are injected to the pod. so the key value pair 
+is available as environmental variables for the application.
+create the configmap and inject into the pod.
+
+configmap.yml:
+
+apiVersion: v1
+kind: configmap
+metadata:
+  name: my-congig
+data:
+  color: blue
+  username: sriraju12
+
+  command to use configmaps -> kubectl get cm or configmaps
+  kubectl describe cm name-of-configmap
+
+  now let's see how to inject into the pod:
+
+  envFrom:    # This is a image level field. i.e injecting through environmental varibale
+    - configMapRef:
+        name: my-config   
+
+
+  if you want to read single value from configmap then use this:
+
+  env:     # This is a image level field. i.e injecting through single environmental varibale
+    - name: color
+      valueFrom:
+        configMapRef:
+          name: my-config
+          key: color
+
+if you want to read as volume then use this:
+volumes:   # This is a container image field 
+  - name: my-volume
+    configMap:
+      name: my-config
+
+
+
+
+SECRETS:
+which is used to store sensitive information like password.
+
+secret.yml:
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: my-secret
+type: Opaque
+data:
+  username: dXNlcm5hbWU=  #  username
+  password: cGFzc3dvcmQ=  # password
+
+  NOTE:
+  to convert into encrypted data then use this -> echo "username" | base64
+
+  command to get secrets -> kubectl get secrets.
+  kubectl describe secret name_of_secret
+
+ how to inject to a pod:
+
+ envFrom:  # This is a image level field  i.e injecting through environmental varibale
+   - secretRef:
+       name: my-secret
+
+ if you want to read single value from secret then use this:
+
+ env:     # This is a image level field. i.e injecting through single environmental varibale
+   - name: username
+     valueFrom:
+        secretKeyRef:
+          name: my-secret
+          key: username
+
+
+if you want to read as volume then use this:
+
+volumes:   # This is a container image field 
+  - name: my-volume
+    secret:
+      secretName: my-secret      
+
+
+NOTE:
+secrets are not encrypted but only encoded. anyone can extract the value from the encoded value from secret.
+implement RBAC for secret for security purposes
+store secrets in external secret store providers like hashicorp, systems manager(AWS), azure vault(AZURE) etc for better practices.
+
+
+
+HPA(Horizontal Pod Autoscaler):
+HPA means adding or removing more pod when the traffic is high based on the cpu utilization.
+we can also scale the nodes(automated) which is called clusterAutoScaler.
+
+manual autoscaler can be done by changing the replicas manually.
+
+command to HPA: kubectl autoscale deployment my-deployment --cpu-percent=50 --min=2 --max=10
+
+command to see HPA: kubectl get hpa 
+command to delete hpa: kubectl delete hpa my-deployment
+command to see events for hpa deployment -> kubectl events hpa nginx-deployment
+
+hpa.yml:
+
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: my-hpa
+  namespace: default
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: my-deployment  # Replace with your deployment name
+  minReplicas: 2
+  maxReplicas: 5
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 50  # Scale if CPU usage exceeds 50%
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 70  # Scale if Memory usage exceeds 70%
+
+when to use:
+web apps, micro services, stateless services
+
+NOTE:
+after kubernetes version 1.23, HPA will comes with default, you don't need to install it.
+
+HPA will keep monitoring the metrics server for the cpu and memory utilization when it goes than mentioned
+then it automatically spin up the pod for you.
+
+
+VPA(Vertical Pod Autoscaler):
+which is used to increase or decrease the capacity(memory and cpu) of the pod. which is called VPA.
+For this, you will edit the pod configuration and resize the memory and cpu.
+
+manual VPA is just editing the deployment, in that increase or decrease the resource requests and limits then
+it will create the new pod with this configuration for us.
+
+VPA does not come with default installation, you need to manually install it and then use it.
+
+when you deploy the vpa, three pods will be running in kube-system namespace there are 
+ 1. vpa admission controller
+ 2. vpa updater
+ 3. vpa recommender
+
+ vpa recommender collects the live data from the metrics server and it provides the recommendation but it will not
+ modify the values in the deployment. vpa updater gets the recommendations from the vpa recommender and
+ terminate the existing pods. vpa admission controller gets the recommendations from the vpa
+ recommender and apply those rule(cpu and memory values) to the pod while creating it. so the pod comes up with
+ new values.
+
+ vpa.yml:
+
+ apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: my-vpa
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: my-deployment
+  updatePolicy:
+    updateMode: "Auto" # Can be "Off", "Initial", or "Auto"
+  resourcePolicy:
+    containerPolicies:
+      - containerName: 'nginx-pod'
+        minAllowed:
+          cpu: 100m
+          memory: 256Mi
+        maxAllowed:
+          cpu: 1
+          memory: 2Gi
+        controlledResources: ["cpu", "memory"]
+
+command to use the recommendation of vpa: kubectl describe vpa my-vpa
+
+when to use:
+stateful workloads, cpu/memory heavy apps(DBs)
+
+
+NOTE:
+in the deployment, in the resources section if you change the cpu or memory value then it will delete pod and
+creates the new pod for us. if you don't want this then you can do the following i.e now it is in beta stage only 
+if you do this, it will just resize the pod without creating the new pod.
+
+in terminal set -> FEATURE_GATES=InPlacePodVerticalScaling=true
+
+and in the pod configuration add this,
+
+resizePolicy:  # This is a image level field
+  - resourceName: cpu
+    restartPolicy: NotRequired
+  - resourceName: memory
+    restartPolicy: NotRequired
+
+
+
+CLUSTER MAINTENANCE(UPGRADES):
+
+for node upgradation:
+
+first drain the node, so that existing pod running on the node will be terminated and recreated on other nodes 
+and also no new pods will be schedule on this node. you can do the upgradation after completion of it then just
+uncordon it so that new will be schedulable.
+
+drain the node -> kubectl drain node-name  i.e it will terminates the existing pod and recreates in other node and
+                                               also marked as unschedulable.
+
+make it as schedulable -> kubectl uncordon node-name 
+
+if you want to just make it as unschedulable -> kubectl cordon node-name
+
+if daemonsets are running then you want to drain it then use this -> kubectl drain node01 --ignore-daemonsets
+
+NOTE:
+if you want to drain the node then the pods running as replicaset will be terminated and recreates in other nodes
+and if any daemonsets are running then use --ignore-daemonsets and if any pod is running that is not part Off
+any replicaset then you need to use the flag --force to drain the node. in this case, the pod lost forever.
+
+hr-app is a critical app and we do not want it to be removed and we do not want to schedule any more pods on node01.
+Mark node01 as unschedulable so that no new pods are scheduled on this node. -> kubectl cordon node_name.
+
+
+if you want to see what version is installed of k8s -> kubectl get nodes
+
+version v1.2.0 -> here v1 is major version, 2 is minor version(every 3 months), 0 is patch(bug fixes frequently)
+
+api server -  it must be latest  for example: api server is v10
+controller-manager - it may latest not higher than api server and can go upto one version below i.e v10 or v9
+scheduler - it may latest not higher than api server and can go upto one version below i.e v10 or v9
+kubelet - it may latest not higher than api server and can go upto two version below i.e v10 or v9 or v8
+kube-proxy - it may latest not higher than api server and can go upto two version below i.e v10 or v9 or v8
+kubectl -> it may be with latest or one version below or one version above i.e v9 or v10 or v11
+
+kubernetes supports only 3 minor version. for example current minor version is 9 then k8s supports 9,8,7 and if
+new version comes then it supports 10,9,8 only.
+
+while upgrading donot skip the version like if you are in v10 and latest version is v12 then don't go directly to
+v12 instead first upgrade to v11 and then upgrade to v12.
+
+upgradation involves two steps, first upgrade the control plan and then upgrade the worker nodes.
+
+for master node:
+when doing the master node, the running pods will work fine, the new pods will not be created and if the pods fails
+then it will not be recreated. running pods don't affect anything, you can access the application.
+
+for worker nodes:
+for upgrading the worker nodes, there are some strategies are there:
+1.upgarde all the nodes at a time, this could causes downtime and it is not good practice.
+2.upgrade one node at a time, which is good practice.
+3.add the new nodes to the cluster to latest version and remove the old nodes
+
+if you are using kubeadm then run -> kubeadm upgrade plan, then it will show current version and latest version
+
+to see what distributions we are using like centos, ubutu etc -> cat /etc/*releases*
+
+
+process to upgrade:
+1.first go to documentation
+2. click on add repository and then verify which distribution is using by running this command -> cat /etc/*releases*
+3. go down below where your distribution is mentioned and then copy the command and paste it notepad
+4. verify the version that you want and update and then copy paste all the commands and verify the version.
+5. login into that control plane, worker plane and then run this commands.
+6. this repository only tells about the minor version only and then in that minor version what patch needs to be installed.
+7. go to the documentation and then go below you see "determine which version to be upgraded".
+8. in that choose your distribution and then copy commands then run those commands.
+9.it will show all the available patches, choose the version you want.
+
+10. upgrading control plane:
+   for this follow the documentation exactly same, just modify the version that you have choosen above.
+   these command needs to be run in control plan itself.
+   all the control plane components are upgraded to new version and you need to manually install the kubelet and kubectl.
+
+11. upgrading worker nodes:
+    just follow the steps in the documentation. 
+    these command needs to be run in worker node itself.
+   all the worker node components are upgraded to new version and you need to manually install the kubelet and kubectl.
+
+
+NOTE:
+this command is used to see taints on the node -> kubectl describe nodes node_name| grep -i taints
+
+
+
+ BACKUP AND RESTORE METHODS:
+
+ three things needs to be backedup: 1. ETCD 
+                                    2. Persistent Volumes(PV)
+                                    3. Resource Configurations
+
+Resource Configurations files need to backedup in the github or use this command kubectl get all --all-namespaces -o yaml > all_resources.yml
+or use external resources to backup the resource configuration.
+
+ETCD is used to store all the cluster information and while creating the ECTD it is backedup with the location var/lib/etcd.
+you can take the snapshot of the ETCD by running the command:
+ETCDCTL_API=3 etcdctl snapshot save snapshot.db \
+--endpoints= listen-client-urls \
+--cacert=  ca-cert file\
+--cert=--cert-file \
+--key= key file    # this information you will get from etcd configuration file. just paste those values.
+
+command to see the status of snapshot -> ETCDCTL_API=3 etcdctl snapshot status snapshot.db
+
+if you want to restore the ETCD:
+1. stop the api server - service kube-apiserver stop
+2. run restore command -> ETCDCTL_API=3 etcdctl snapshot restore snapshot.db --data-dir /var/lib/etcd-from-backup
+3. we need to modify the ETCD configuration i.e change to this --data-dir=/var/lib/etcd-from-backup
+4. reload the daemon service -> systemctl daemon-reload
+5. restart the etcd service -> service etcd restart
+6. start the apiserver -> service kube-apiserver start
+
+
+
+SECURITY:
+whenever you want to do something on the k8s cluster then that request goes to the API SERVER. so first we need
+to secure the API SERVER like who can access(Authentication) and what can they do(Authorization)
+
+Authentication to the API SERVER can be done in following ways:
+1.files - username and password or tokens
+2.certificates
+3.external authentication providers i.e LDAP
+4.service accounts.
+
+After login is success then what can they do in the cluster is define is Authorization
+Authorization can be done using RBAC.
+
+All the communication between the various components such as ETCD,scheduler, kube proxy,kubelet,controller manager
+can be done using TLS certificates.
+
+By default, all the pods in the cluster can communicate each other. we can restrict that using network policies.
+
+
+ securing k8s the cluster access using Authentication:
+ they are twi types of peoples are there 1. users to do the admin or deployment work
+                                         2. service account i.e you want to access the some service outside the k8s cluster.
+
+k8s does the manage the user management. it gives that to external providers like LDAP or certificates or files etc.
+you cannot create the users in k8s but you can create the service accounts in k8s cluster.
+
+all the user access is managed by the API SERVER whether you are accessing the k8s cluster using kubectl or API.
+all that request will goes to the API SERVER. The API SERVER authenticate the request before processing it.
+
+how API SERVER Authenticate it:
+using static files - username and password or tokens or certificates or external authentication providers i.e LDAP
+
+let's see using static files - username and password or tokens:
+1. first create the CSV file and then inside they are 3 columns like password,username and userid i.e pass123,raju12,u0012.
+2. we need to pass this file to the API SERVER configuration.
+3. add this, --basic-auth-file=user-details.csv
+4. restart the api server
+5. we can have 4th column as group 
+6. similarly we can use tokens instead passwords and just pass the same file to the API SERVER configuration in the command section.
+7. we can authenticate it using curl command
+8. curl -v -k https://master-node-ip:6443/api/v1/pods --header "Authorization: username token or password"
+
+this is not recommended method to use because we are passing directly the CSV file instead use Volumes.
+follow the below steps to configure it:
+
+Create a file with user details locally at /tmp/users/user-details.csv
+
+# User File Contents
+password123,user1,u0001
+password123,user2,u0002
+password123,user3,u0003
+password123,user4,u0004
+password123,user5,u0005
+
+
+Edit the kube-apiserver static pod configured by kubeadm to pass in the user details. The file is located at /etc/kubernetes/manifests/kube-apiserver.yaml
+
+
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: kube-apiserver
+  namespace: kube-system
+spec:
+  containers:
+  - command:
+    - kube-apiserver
+      <content-hidden>
+    image: k8s.gcr.io/kube-apiserver-amd64:v1.11.3
+    name: kube-apiserver
+    volumeMounts:
+    - mountPath: /tmp/users
+      name: usr-details
+      readOnly: true
+  volumes:
+  - hostPath:
+      path: /tmp/users
+      type: DirectoryOrCreate
+    name: usr-details
+
+
+Modify the kube-apiserver startup options to include the basic-auth file
+
+
+
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: null
+  name: kube-apiserver
+  namespace: kube-system
+spec:
+  containers:
+  - command:
+    - kube-apiserver
+    - --authorization-mode=Node,RBAC
+      <content-hidden>
+    - --basic-auth-file=/tmp/users/user-details.csv
+Create the necessary roles and role bindings for these users:
+
+
+
+---
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  namespace: default
+  name: pod-reader
+rules:
+- apiGroups: [""] # "" indicates the core API group
+  resources: ["pods"]
+  verbs: ["get", "watch", "list"]
+ 
+---
+# This role binding allows "jane" to read pods in the "default" namespace.
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: read-pods
+  namespace: default
+subjects:
+- kind: User
+  name: user1 # Name is case sensitive
+  apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: Role #this must be Role or ClusterRole
+  name: pod-reader # this must match the name of the Role or ClusterRole you wish to bind to
+  apiGroup: rbac.authorization.k8s.io
+Once created, you may authenticate into the kube-api server using the users credentials
+
+curl -v -k https://localhost:6443/api/v1/pods -u "user1:password123"
+
+
+
+Using Certificates:
+
+A certificate is used to guranteed trust between two parties during transaction. for example, if user requested
+to access the web server TLS Certificates ensure that the communication between user and webserver is encrypted.
+
+without TLS Certificates, if user sends request then user details like username,password will go in plain text
+format, the hackers will easily get those details. so we need to encrypt the data that is being sent.
+the details is encrypted using a KEY that is a random number and alphabets. you add that random number to your data
+and you can encrypt that data using any encryption so that nobody can knows about it. the data will be sent to the
+server. if hackers can get that data but they cannot do anything about it. however, same with the webserver
+without the key. so a copy of the key should be sent to the webserver, so that the server can decrypt the data
+and read the message. if you sent that key with the same network then the hacker also get that key and decrypt
+the data with it. This mechanism is called symmetric encryption. using this mechanism hacker can get the key 
+and decrypt the data. This can resolved using Asymmetric encryption.
+
+Asymmetric encryption:
+instead of using single key to encrypt or decrypt the data, Asymmetric encryption uses pair of keys that is 
+public key and private key. let's understand with simple example, think private key as locker key(user) and public key
+as Lock(webserver). the key is with me so it is private and lock is public so that anyone can access it.
+
+let's understand with SSH example to server:
+if you want to access the server then you need to have public key and private key. you can generate it using
+ssh-keygen. you can secure the server with the public key. if you want to access the server then you will provide 
+the private key then you can access the server.
+
+in Asymmetric encryption, we will use openssl to generate public and private keys
+openssl genrsa -out my-bank.key 1024 -> private key
+openssl rsa -in my-bank.key -pubout > my-bank.pem -> public key
+
+when the user access the server in the browser it get the public key from the server and hacker is watching this
+request then hacker too get the public key. the browser encrypts the symmetric key using public key that is provided
+by the server. the symmetric key is now secured. the user sends this to the server and hacker also gets the copy
+the server uses the private key to decrypt it and retrieve the symmetric key. however the hacker does not have 
+the private key he does not decrypt it. this way we can secure the communication.
+
+
+securing k8s with TLS Certificates:
+they are three types of certificate 1. client certificates i.e client has
+                                    2. server certificate i.e server has
+                                    3. root certificate i.e certificate authority(CA) has(we need CA to sign our certificates)
+
+usually certificates with .pem, .crt are public key certificate 
+certificates with .key or .pem or in the name with key are private key certificates
+
+in k8s, we have master node and working nodes, we have secure the communication between this and user requests
+something in k8s then the requests goes to the API SERVER, this also needs to be secured.
+
+here we need client and server certificates.
+
+in k8s, the server components are API SERVER, ETCD AND KUBELET, these three servers need server certificates.
+client components are users, scheduler, controller manager,kube-proxy. 
+every components has it's own public and private key certificates.
+
+
+How to generate certificates:
+to generate the certificate we can have openssl,easyrsa and cfssl etc.
+
+let's see how we can generate certificates using OPENSSL for server:
+1. generate private key using openssl -> openssl genrsa -out ca.key 2048
+2. openssl request command along with the key we have generated to generate the certificate signing request.
+   -> openssl req -new -key ca.key -subj "/CN=KUBERNETES-CA" -out ca.csr 
+3. sign certificate command -> openssl x509 -req -in ca.csr -signkey ca.key -out ca.crt   
+                
+let's see how we can generate certificates using OPENSSL for clients:
+1. create the private key for admin user -> openssl genrsa -out admin.key 2048
+2. generate CSE(Certificate Signing Request) -> openssl req -new -key admin.key -subj "/CN=kube-admin/O=system:masters" -out admin.csr  i.e here system:masters is group
+3. generate sign certificate -> openssl x509 -req -in admin.csr -CA ca.crt -CAkey ca.key -out admin.crt    
+
+How to view certificates:
+
+1. first know how k8s cluster setup i.e using kubeadm(managed) or manually.
+2. if manually setuped then you need to do above steps to create certificates.
+3. using kubeadm, it will automatically creates for you.
+
+let's see if cluster is created using kubeadm then follow below steps:
+path is -> /etc/kubernetes/manifests/
+
+check the configuration file of the component about the certificate information and also you can check the
+logs of the components.
+
+if kubectl is not working then try with the docker logs by identifying the container.
+
+
+KUBE CONFIG:
+This is used to store the clusters,user information.
+basically which contains three fields mainly:
+1. cluster - all the information like cluster names, certificates need to be mentioned.
+2. context - which is used to link user and cluster. so that users can access the different clusters
+3. users - what kind of users there in the k8s
+
+command to see the current kube-config information -> kubectl config view
+
+
+
+API GROUPS:
+
+These APIs are categorized into two;
+1.the core group
+2.the named group.
+
+The core group is where all core functionality exists, such as namespaces, pods, replication controllers,
+endpoints, nodes, bindings, persistent volumes, persistent volume claims, conflict maps,
+secrets, services, etc.
+
+The named group APIs are more organized and going forward, all the newer features are going to be made available
+through these named groups.It has groups under it for apps, extensions, networking, storage,authentication,
+authorization, etc.Shown here are just a few.Within apps, you have deployments,replica sets, stateful sets.
+Within networking, you have network policies.Certificates have these certificate signing requests
+that we talked about earlier in the section.So the ones at the top are API groups,
+and the ones at the bottom are resources in those groups.Each resource in this has a set of actions associated
+with them; Things that you can do with these resources,such as list the deployments,
+get information about one of these deployments,create a deployment, delete a deployment,
+update a deployment, watch a deployment, etc.These are known as verbs.
+
+
+Authorization:
+after successful authentication, what can access within the cluster.
+
+There are different authorization mechanisms supported by Kubernetes,
+such as node authorization, attribute-based authorization, role-based authorization and webhook.
+
+RBAC(Role Based Access control):
+Role-based access controls make these much easier. With role-based access controls, instead of directly
+associating a user or a group with a set of permissions, we define a role, in this case for developers.
+We create a role with the set of permissions required for developers then we associate all the developers
+to that role. Similarly, create a role for security users with the right set of permissions required for them
+then associate the user to that role. Going forward, whenever a change needs to be made to the user's access
+we simply modify the role and it reflects on all developers immediately. Role-based access controls provide 
+a more standard approach to managing access within the Kubernetes cluster.
+
+Now, what if you want to outsource all the authorization mechanisms? Say you want to manage authorization
+externally and not through the built-in mechanisms that we just discussed. For instance, Open Policy Agent 
+is a third-party tool that helps with admission control and authorization. You can have Kubernetes make an
+API call to the Open Policy Agent with the information about the user and his access requirements,
+and have the Open Policy Agent decide if the user should be permitted or not. Based on that response,
+the user is granted access.
+
+RBAC can be implemented using Roles and Roles Bindings.
+
+ROLES AND ROLE-BINDINGS:
+
+let's create the role.yml file,
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: developer-role
+rules:
+  - apiGroups: [""]  # here empty quotes means core api group
+    resources: ["pods", "configmaps"]
+    verbs: ["create", "get", "update", "patch", "delete"]
+
+now let's attach this role to a dev-user using role-binding.yml file:
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: developer-rolebinding
+subjects:
+  - kind: User
+    name: dev-user
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: Role
+  name: developer-role
+  apiGroup: rbac.authorization.k8s.io
+
+NOTE:
+role and role-binding is specific to the namespace only, here dev-user can access the pods and configmaps 
+in the default namespace only.
+
+command to see the roles -> kubectl get roles
+command to see the role-bindings -> kubectl get rolebindings
+
+if you want to check the access to a particular resource in a cluster -> kubectl auth can-i create deployments i.e output is if you have access then it prints yes else no 
+
+you have created the role and rolebinding for a user and you want to check the access whether they are working
+or not then use this command without authenticating(login) with the user:
+
+kubectl auth can-i create deployments --as dev-user i.e it prints no because in above we haven't given permissions for deployment.
+kubectl auth can=i create pods --as dev-user -> it prints yes because we have given permissions for pods.
+
+NOTE:
+we have give access to specific resource like instead of giving access to all pods, you can give access to 
+specific pods. add this below the verbs: resourceNames: ["nginx-pod","busybox-pod"]
+
+if you want to see the what Authorization mechanisms used for the cluster then describe the api-server, in the
+command section you can see the field called --authorization-mode.
+
+
+CLUSTER ROLES AND CLUSTER ROLE_BINDINGS:
+cluster roles and cluster role-binding are scoped to cluster whereas role and role-binding are scoped to namespaces.
+
+the resources that comes under cluster are:
+nodes, pv, cluster-roles, cluster-rolebindings, namespaces, certificatesigningrequests
+
+if you want to see the namespaced resources then use this -> kubectl api-resources --namespaced=true
+if you want to see the non namespaced resources then use this -> kubectl api-resources --namespaced=false 
+
+cluster-role.yml:
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cluster-administrator
+rules:
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["create", "get", "list", "watch", "update", "patch", "delete"]
+
+cluster-rolebinding.yml:
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: cluster-admin-nodes-binding
+subjects:
+  - kind: User
+    name: cluster-admin-user  
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: ClusterRole
+  name: cluster-administrator
+  apiGroup: rbac.authorization.k8s.io
+
+NOTE:
+You can create a cluster role for namespaced resources as well. When you do that, the user will have access to 
+these resources across all namespaces.
+
+when we created a role to authorize a user to access pod, the user had access to pods in a particular namespace
+alone. With cluster roles, when you authorize a user to access the pods, the user gets access to all pods
+across the cluster.
+
+
+
+SERVICE ACCOUNTS:
+in k8s, they are two types of accounts: 1. user accounts (for users)
+                                        2. service accounts (for applications)
+
+I've built a simple Kubernetes dashboard application named My Kubernetes Dashboard. It's a simple application
+built in Python, and all that it does when deployed is retrieve the list of pods on a Kubernetes cluster
+by sending a request to the Kubernetes API, and display it on a webpage. In order for my application to query 
+the Kubernetes API, it has to be authenticated. For that, we use a service account. 
+
+command to create service account: kubectl create serviecaccount my-sa
+command to see serviecaccounts -> kubectl get sa
+
+When the service account is created,it also creates a token automatically. The service account token is what
+must be used by the external application while authenticating to the Kubernetes API. The token, however,
+is stored as a secret object. In this case, it's named my-sa-token-kbbdm. So when a service account 
+is created,it first creates the service account object,and then generates a token for the service account.
+It then creates a secret object and stores that token inside the secret object. The secret object is then 
+linked to the service account.To view the token, view the secret object by running the command 
+kubectl describe secret. This token can then be used as an authentication bearer token while making a 
+risk call to the Kubernetes API. For example, in this simple example, using Curl, you could provide the
+bearer token as an authorization header while making a risk call to the Kubernetes API.
+
+You can create a service account,assign the right permissions using role-based access control mechanisms,
+and export your service account tokens, and use it to configure your third party application to authenticate
+to the Kubernetes API.
+
+For every namespace in Kubernetes, a service account named default is automatically created. Each namespace
+has its own default service account.
+
+Whenever a pod is created, the default service account and its token are automatically mounted to that pod
+as a volume mount. you can check this by describing the pod, in the volumes section you can find that the
+default-token in mounted.
+
+if you want to add the service account that we have created to the pod then add field called serviceAccountName.
+this is a container level field. you can edit the service account of a existing pod, you can delete and recreate it.
+using deployment you can edit the service account(it actually deletes and recreate it for us)
+
+you can set to not attach any default service account to a pod. use this field called automountServiceAccountToken: false.
+this is a container level field.
+
+version 1.24,a change was made where when you create a service account, it no longer automatically creates
+a secret or a token access secret. So you must run the command Kubectl to create token, followed by the name
+of the service account to generate a token for that service account if you needed one. And it will then print
+that token on screen. Now, if you copy that token, and then if you try to decode this token, this time, you'll
+see that it has an expiry date defined. And if you haven't specified any time limit, then it's usually one hour
+from the time that you run the command. You can also pass in additional options to the command to increase the 
+expiry of the token.
+
+command to create the token for SA(Service Account) -> kubectl create token <service-account-name> -n <namespace>
+
+
+
+IMAGE SECURITY:
+1. store the images in private repository
+2. in the deployment mention the full name of the image i.e registry/username/image_name:target like docker.io/sriraju12/springcicd:2
+3. if images are stored in private repository then how can kubernetes pull those images. first create the secret
+   for that repository in that pass username, password or token, server and email.
+4. in the pod Configuration, add the field called
+   imagePullSecrets:
+     - name: name_of_the_secret. this is a container level field.
+
+
+SECURITY CONTEXT:
+in docker, by default the containers will run as root user and if you want to run with some userid then while 
+writing the docker file you can add USER 1010 or run docker command -> docker run --name nginx nginx --user 1010.
+
+how can we do this using kubernetes:
+
+if you want to apply this to a pod then it will apply to the all the container inside the pod:
+if you want this for pod then add this: 
+securityContext: # this is a container level field
+  runAsUser: 1010
+
+if you want this for container then add this:  
+securityContext:  # this is a image level field
+  runAsUser: 1010 
+
+NOTE:
+if you mention securty context at pod level and container level then container level security context will override
+the pod level security context.
+
+
+NETWORK POLICIES:
+it is used to restrict the accessing of pod with another pod. by default, in k8s we can access one pod with
+another pod. for example, there is a frontend pod, backend pod and database pod. the frontend pod should be
+accessing the database pod, we can achieve this using network policies.
+
+here we need to apply the network policy to the database pod and allow access only from backend pod.
+
+network_policy.yml:
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-my-app
+spec:
+  podSelector:
+    matchLabels:
+      app: my-app  # here need to mention the database pod label
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              role: backend  # Only allow traffic from pods with this label i.e backend pod
+      ports:
+        - protocol: TCP
+          port: 3306
+
+here it will block only ingress(incoming) traffic not egree(outgoing)
+
+if you have 3 namespaces(dev,stage and prod) and in these 3 namespaces, 3 backend pods are running then by using
+above code all the 3 pods from 3 namespace will able to access the database pod. you want to access the pod from 
+prod namespace only then add this:
+namespaceSelector: # this label need to be present in the prod namespace.
+  matchLabels:
+    name: prod
+
+complete_network_policy.yml:
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-my-app
+spec:
+  podSelector:
+    matchLabels:
+      app: my-app  # here need to mention the database pod label
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              role: backend  # Only allow traffic from pods with this label i.e backend pod
+
+          namespaceSelector: # this label need to be present in the prod namespace.
+            matchLabels:
+            name: prod
+      ports:
+        - protocol: TCP
+          port: 3306
+
+in the above code, if you only mention the namespaceSelector then all the pods from that namespace can access 
+the database pod. pods from outside the namespace can not access the database pod.
+
+if there is a backup server that is present outside the cluster i.e it is not deployed in k8s. This backup
+server needs to connect with the database pod, how can we do that. we can not use podSelector and namespaceSelector.
+instead we can use ip block, to allow traffic from specific ip address. add this:
+ipBlock:
+  cidr: 192.168.5.10/12
+
+complete_network_policy.yml:
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-my-app
+spec:
+  podSelector:
+    matchLabels:
+      app: my-app  # here need to mention the database pod label
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              role: backend  # Only allow traffic from pods with this label i.e backend pod
+
+          namespaceSelector: # this label need to be present in the prod namespace.
+            matchLabels:
+            name: prod
+
+        - ipBlock:
+            cidr: 192.168.5.10/12
+      ports:
+        - protocol: TCP
+          port: 3306
+
+
+these are the 3 supported types in network policies. In the above code, database pod can access the backend pod
+from the prod namespace and backup server that is present outside the cluster. these 2 pods can access the database
+pod. 
+
+in the above code, podSelector and namespaceSelector are used together and if mention like in below code then
+it will consider as three rules like any backend pod can access the database pod, any pod in the prod namespace
+can access the database pod and backup server also access the database pod.
+
+complete_network_policy.yml:
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-my-app
+spec:
+  podSelector:
+    matchLabels:
+      app: my-app  # here need to mention the database pod label
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              role: backend  # Only allow traffic from pods with this label i.e backend pod
+
+        - namespaceSelector: # this label need to be present in the prod namespace.
+            matchLabels:
+            name: prod
+
+        - ipBlock:
+            cidr: 192.168.5.10/12
+      ports:
+        - protocol: TCP
+          port: 3306
+
+instead of the backup server initiating a backup,say we have an agent on the database pod that pushes backup to the
+backup server. In that case, the traffic is originating from the database pod to an external backup server. 
+here we need to use egress.
+
+complete_network_policy.yml:
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-my-app
+spec:
+  podSelector:
+    matchLabels:
+      app: my-app  # here need to mention the database pod label
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              role: backend  # Only allow traffic from pods with this label i.e backend pod
+
+        - namespaceSelector: # this label need to be present in the prod namespace.
+            matchLabels:
+            name: prod
+
+        - ipBlock:
+            cidr: 192.168.5.10/12
+      ports:
+        - protocol: TCP
+          port: 3306
+
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 192.168.5.10/12 # here we can not use podSelector and namespaceSelector because webserver is present outside the cluster.
+      ports:
+        - protocol: TCP
+          port: 80  # web server port               
+
+
+network solutions that supports network policies:
+kube-router, calico, weave-net,romana
+
+network solutions that does not supports network policies:
+flannel
+
+command to see the network policies: kubectl get networkpolicy
+
+NOTE:
+
+Kubectx:
+With this tool, you don't have to make use of lengthy “kubectl config” commands to switch between contexts. 
+This tool is particularly useful to switch context between clusters in a multi-cluster environment.
+
+Installation:
+sudo git clone https://github.com/ahmetb/kubectx /opt/kubectx
+sudo ln -s /opt/kubectx/kubectx /usr/local/bin/kubectx
+
+Syntax:
+
+To list all contexts:
+kubectx
+
+To switch to a new context:
+kubectx <context_name>
+
+To switch back to previous context:
+kubectx -
+
+To see current context:
+kubectx -c
+
+
+Kubens:
+This tool allows users to switch between namespaces quickly with a simple command.
+
+Installation:
+sudo git clone https://github.com/ahmetb/kubectx /opt/kubectx
+sudo ln -s /opt/kubectx/kubens /usr/local/bin/kubens
+
+Syntax:
+
+To switch to a new namespace:
+kubens <new_namespace>
+
+To switch back to previous namespace:
+kubens -
+
+
+STORAGE:
+
+volumes:
+
+when the pod is created and store the data in the pod itself, when pod is deleted or destroyed then the data
+of the pod also deleted. if you want to store the data even when the pod gets deleted then you can use 
+volumes. create the volume and attach it to the pod.
+
+let's see how to create a volume and mount it to a pod:
+
+volumes: # creating volume i.e this is a container level field
+  - name: data-volume
+    hostPath:
+      path: /data
+      type: Directory
+
+volumeMounts: # image level field
+  - mountPath: /opt
+    name: data-volume
+
+here the pod data is located in the container path called /opt and in the host machine data is available in /data
+.if the pod gets deleted then the data still present in the location in the host i.e /data.
+
+This way of storing data is fine for single node, if you have multiple nodes then this method is not recommended.
+
+persistent volumes:
+for suppose, there are multiple pods are there and you want to configure the volumes for that pods then for all
+the pods you need to attach volumes for all the pods. if you want to manage the storage centrally then use 
+persistent volumes. you can create the PV with large storage and if you want storage for a pod then you can
+request some storage from a PV(Persistent Volume), this is called PVC(Persistent Volume Claims).
+
+pv.yml:  # creates the ebs volume in aws
+
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-ebs
+spec:
+  capacity:
+    storage: 10Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain  # Prevents deletion of the EBS volume after PV release.
+  storageClassName: gp2
+  csi:
+    driver: ebs.csi.aws.com
+    volumeHandle: vol-0123456789abcdef0  # Replace with your actual EBS volume ID
+
+pvc.yml:
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pvc-ebs
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: gp2  # Ensure this matches the PV's storageClassName
+
+
+if you have created, PV and PVC then you want to attach that PVC to a pod as volume then follow below:
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: mypod
+spec:
+  containers:
+    - name: myfrontend
+      image: nginx
+      volumeMounts:
+      - mountPath: "/data"
+        name: pvc-ebs
+  volumes:
+    - name: mypd
+      persistentVolumeClaim:
+        claimName: pvc-ebs
+
+NOTE:
+1.What would happen to the PV if the PVC was destroyed:
+
+  The PV is not deleted → It remains in the cluster.
+  The PV status changes to "Released" → It is no longer bound to any PVC.
+  The data on the volume is preserved → The EBS volume is still available in AWS.
+  A new PVC cannot automatically claim it → An administrator must manually reclaim or delete the PV.
+
+2. Why is the PVC stuck in Terminating state after deleting the pvc when it is bound to the pv and retainPolicy as retain.
+   and pvc is used by the pod:
+
+   the pvc is used by the pod.
+
+3. if you delete the pod then pvc will be deleted and pv will be in the state called Released.
+
+
+STORAGE CLASS:
+from the above code, if want to create the PV then first you need to create the EBS storage in aws manually
+then only you can create PV. this is called static provisioning.
+
+if the volume gets provisioned automatically when the application requires it, and that's where storage classes
+come in. With storage classes, you can define a provisioner, such as Google Storage, that can automatically
+provision storage on Google Cloud and attach that to pods when a claim is made.
+That's called dynamic provisioning of volumes.
+
+storage class:
+A StorageClass in Kubernetes helps dynamically provision storage using cloud storages such as EBS, EFS etc.
+if you use the storage class then you don't need to write the PV because Kubernetes dynamically provisions a 
+PersistentVolume (PV) for you.
+
+sample storage class for aws:
+
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: ebs-storage-class
+provisioner: ebs.csi.aws.com
+parameters:
+  type: gp3  # Change to gp2 if needed
+  fsType: ext4
+reclaimPolicy: Retain
+volumeBindingMode: WaitForFirstConsumer
+
+NOTE:
+if you use VolumeBindingMode as WaitForFirstConsumer then if you create StorageClass and PVC then the PVC is still
+in pending state only because it is not attached to the pod. if you attach to it then the status is changed to bound.
+
+
+NETWORKING:
+
+CNI (Container Network Interface) is a standard for configuring networking in containerized environments like
+Kubernetes. It defines how network plugins should add and remove network interfaces from containers.
+
+Key Points:
+Used in Kubernetes: Manages networking for Pods.
+Plugins: Examples include Flannel, Calico, Cilium, and Weave.
+Tasks:
+Assign IP addresses.
+Set up routing.
+Implement network policies.
+
+command to see the mac address of the node: ip link show eth0
+
+command to see the which network interface is used for node -> ip a | grep -B2 node_Internal_ip
+
+what is the path, where all the CNI supported plugins are available -> /opt/cni/bin
+
+to check which CNI plugin is used in k8s cluster -> ls /etc/cni/net.d/
+
+to check the default gateway configured on the PODs scheduled on particular node -> first login into node and then run ip route command.
+
+Where is the configuration file located for configuring the CoreDNS service -> kubectl -n kube-system describe deployments.apps coredns | grep -A2 Args | grep Corefile
+
+
+Ingress:
+ngress in Kubernetes is an API object that manages external access to services within a cluster, typically 
+HTTP and HTTPS traffic. It provides routing rules to expose services using a single entry point
+(like a domain name) and can handle features like load balancing, SSL termination, and path-based routing.
+
+Key Components:
+Ingress Resource: Defines routing rules (e.g., path-based or host-based).
+Ingress Controller: Implements the rules defined in the Ingress resource (e.g., NGINX, Traefik, HAProxy).
+
+when you want to implement ingress in k8s then follow below steps:
+1. first deploy the ingress controller based on your requirement like nginx-ingress-controller etc.
+2. write the ingress resource yml file, which defines the rules like when you hit on this domain name
+   the traffic should goes to which service.
+3. ingress controller reads the rules from the ingress resource and creates a load balancer with the rules.
+4. when you hit on the domain then it will goes to the mentioned service in the ingress resource and then 
+   it go to the pod and we can access the application.
+5. important note, without ingress controller, ingress resource can not anything and vice versa.
+
+here is the sample ingress resource yml file which include both(path based and host based):
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: app.example.com  # Host-based rule
+    http:
+      paths:
+      - path: /app1   # Path-based rule
+        pathType: Prefix
+        backend:
+          service:
+            name: app1-service
+            port:
+              number: 80
+      - path: /app2   # Path-based rule
+        pathType: Prefix
+        backend:
+          service:
+            name: app2-service
+            port:
+              number: 80
+  
+
+  NOTE:
+  
+  what is rewrite annotation in ingress resource:
+
+  The nginx.ingress.kubernetes.io/rewrite-target annotation is used to modify the request path before forwarding
+  it to the backend service. It is mainly useful in path-based routing, where you want to expose 
+  multiple services under different paths but do not want the backend service to receive the entire path.
+
+  How It Works:
+  When a client makes a request to the Ingress, the request path can be rewritten before being sent to the
+  backend service.
+  If set to /, it removes the prefix from the original request path.
+  If set to /new-path, it replaces the original request path with /new-path.
+
+
+drawbacks of ingress:
+
+1. Ingress Controller Dependency
+   Problem: Ingress itself is just a configuration; it requires an Ingress Controller 
+   (like NGINX, Traefik, or HAProxy) to work.
+   Limitations:
+   If an Ingress Controller is not installed, Ingress will not work.
+
+2. Limited Protocol Support: 
+   Ingress primarily supports HTTP(S) traffic only.It does not support TCP, UDP, or gRPC natively
+   (unless using a special controller like Traefik or HAProxy)
+
+3. TLS & SSL Limitations:
+   TLS termination in Ingress is not dynamic and requires pre-configured secrets.
+   Limitations:
+   Does not support automatic wildcard certificates unless using a cert-manager. Certificate renewal requires
+   manual updates unless integrated with Let's Encrypt.
+
+The above problems are resolved using gateway api.
+
+Gateway API:
+Gateway API is an official Kubernetes project focused on layer four and layer-seven routing.
+
+inorder to implement Gateway API, the following things need to do:
+1. need to deploy the gateway controller like nginx(it is just like ingress controller).
+2. need to write the gateway yml i.e it Defines entry point for external traffic.
+3. need to write the virtual service yml i.e it Routes requests to backend services.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

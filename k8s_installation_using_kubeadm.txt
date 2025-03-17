@@ -1,0 +1,75 @@
+Steps to install the k8s cluster using kubeadm:
+
+1. download the vagrant(automatically provisioning of VM's) and virtual box(creates VM's)
+2. add the configuration details in the Vagrantfile about VM's.
+3. open k8s documentation, first install the kudeadm in all the nodes(master and worker nodes)
+   
+   for that, first Download the public signing key for the Kubernetes package repositories:
+   curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.32/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+
+   add the package repository:
+   echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.32/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list
+
+   upgarde and download the kubeadm:
+   sudo apt-get update
+   sudo apt-get install -y kubelet kubeadm kubectl
+   sudo apt-mark hold kubelet kubeadm kubectl
+
+   to verify the version of kubeadm then run the command -> kubeadm version
+
+4. install the container runtime in master and worker nodes. i.e to run pod,we need container runtime.
+   
+      command -> sudo apt update && sudo apt install containerd -y
+
+5. need to download the cgroup drivers. first we need to check what our VM is using for that run the below command.
+   here cgroup drivers are used to constrain resources that are allocated to processes. i.e to set the resource
+   requests and limits on pod.
+   
+    ps -p 1 -> run this is VM 
+
+    after version v1.21, the default cgroup driver set to systemd, just need to add the configuration in the location
+    /etc/containerd/config.toml. if this directory is not present then create it in all the nodes(master and worker).
+
+    containerd config default -> this command shows the default configuration.
+
+    run this command to set the cgroupdriver to systemd:
+    containerd config default | sed 's/SystemdCgroup = false/SystemdCgroup = true/' | sudo tee /etc/containerd/config.toml
+
+6. restart containerd -> sudo systemctl restart containerd
+
+7. install the control plan components using kubeadm. command is below. i.e run the below command in only master node.
+
+   sudo kudeadm init --apiserver-advertise-address 192.168.52.12(Node_IP) --pod-network-cidr "10.244.0.0/16" --upload-certs
+
+   here pod-network-cidr is used by pod to get ip address for it within this range. here upload-certs will upload 
+   all the certificate to the secrets, so that all of the other nodes will have access to the certificates.
+
+8. after the installing control plan component, in the output it will show us to, set the kubeconfig to default user.
+   and also it will give command to install network plugin and then it will provide the command to join the 
+   worker nodes to the master nodes.
+
+      commands:
+                 mkdir -p $HOME/.kube
+                 sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+                 sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+9. run kubectl get nodes, it will display the master node and the status is pending because we haven't configure
+   the network plugin. the click on the addons in documentation it will show you supported network plugins.
+   choose whatever you want.
+
+   command -> kubectl apply -f https://docs.projectcalico.org/manifests/calico.yaml
+
+   NOTE:
+   the default pod networking range is 10.244.0.0/16, if you have used your own cidr range then in the calico.yaml
+   file change the pod networking to your cidr range.
+
+10. join the worker noder with the master node. This command is given after install the control plan components.
+
+    command ->  kubeadm join <control-plane-host>:<control-plane-port> --token <token> --discovery-token-ca-cert-hash sha256:<hash>
+    
+
+
+    
+
+
+

@@ -1,0 +1,188 @@
+Kustomization:
+
+Kustomize is a native kubernetes configuration management tool.
+
+Let's consider a scenario, there is a nginx deployment yaml and there are different namespaces like dev,staging and prod etc.
+if you want to deploy specific version of nignx to one namespace and latest version to remaining two namespaces. How would you achieve this.
+In real world, Kustomize is compare to ansible which is also configuration management tool.
+Kustomize will deploy different package to the different namespace.
+
+if we can do this by using kubectl then what is the need of Kustomize here.
+consider this scenario, if you want to deploy 3 replicas to dev, 4 replicas to staging,5 replicas to prod then you wrote separate yaml file 
+for those deployement and then you run kubectl apply to deployment it. In future, due to some vulnerability found on the image
+you want to change the image to latest version. Let's say there are 50 deployement file in each namespace then changing those image and then again re-run the kubectl apply
+command would be difficult. These problems are resolved by Kustomize.
+Kustomize is also developed by kubernetes.
+
+Using Helm also we can do the same thing like in template we will define the deployment yaml and for replicas we will variablize it and then
+we will create different values.yml file for each namespace to deploy it in namespace then what's the use of Kustomize here.
+Helm uses the template way. Kustomize uses template free way and it's makes that process simple.
+
+how to use Kustomization:
+we will write the deployement.yaml and then we need to create the Kustomization.yml file, here we need mention the details like apiVersion, kind which is Kustomization and then we need to write the resources.
+in that resources, just mention the deployement yaml file name. here why we are not providing services, configmap etc because i just want only deployement yaml file needs customization remaining yaml files are same throughout all the namespace.
+basically, whatever files you need Kustomization then those yaml file need to mention in resources section.
+
+first we need to create one folder which is base, In this folder we need write all the yaml files and also create the Kustomization yaml and mention which resources need Kustomization and remaining resources needs to deploy directly into the namespace.
+we will create the different folder like dev,staging and prod. cd into that folder and then again create the Kustomization.yml file because previously we have created that for which resources needs Kustomization and then this is for specific to this namespace.
+in that Kustomization, mention apiVersion, kind as Kustomization and then resources and in resources mention where the base deployement yaml file is present. and also write the transformers which is namePrefix: dev-. This will deploy the deployement with name dev-name of the deployment that we have mention in deployement yaml.
+
+if you want to run this, first you need to load the base folder so that kubernetes understand that use this deployment file as reference.
+first run this -> kubectl kustomize base -> it will print the deployement file.
+then run -> kubectl kustomize dev  -> it will print the deployment yaml file with new changes i.e it changes the name of the deployement
+By using this you can easily deploy the deployement into different namespaces with different names.
+
+Just now we have seen how to change the name of the deployement yaml file, now let's see how to change the image of the deployement yaml file.
+in the dev Kustomization yaml file, just mention images and inside images mention name of the existing image and then newName: here mention new image name and then newTag: here mention tag of the new image that's it.
+While running it, first reload the base folder and then run it.
+
+The Advantages of using Kustomization in kubernetes:
+
+1.No Need to Modify Base Manifests – You can apply changes without altering the original YAML files, making updates easier.
+2.Overlays for Different Environments – You can create different configurations (e.g., dev, staging, production) using overlays instead of maintaining separate files.
+3.Reusability & Maintainability – Base manifests can be reused across multiple deployments, reducing duplication.
+4.Declarative Resource Customization – You can add labels, modify images, set namespace values, or change configurations without manually editing YAML files.
+5.Works Natively with kubectl – Kustomization is built into kubectl apply -k, so no extra tools are needed.
+
+if you don't want to use the built-in transformers for changing such as namePrefix to change the name, images to change the image then you can you patches.
+here base folder is same and in dev folder, for example to change the replicas count then create the replicas.yaml file. here name is anything and then
+copy the base deployement yaml file upto replicas and then paste it in replicas.yaml and create the Kustomization. in that mention apiVersion, kind, and also mention patches: inside it - path: mention path of the replicas yaml file that's it.
+
+Note:
+whenever you don't want use in-built transformers, then just copy base yaml file upto the field where you want to make changes and then
+create yaml file with some name and paste it. Then write Kustomization yaml file mention patches and inside it mention the path where that yaml file is present that's it.
+
+overviews:
+if you want to use Kustomization then you can use 1. built-in transformers
+                                                  2. using patches(we can create the our own patch yaml files)
+
+patches can be done using YAML and JSON(which also write in YAMl)
+
+NOTE:
+
+if you want to show what kustomize folder will create -> kustomize build k8s/
+
+if you want to deploy the kustomize file then -> kustomize build k8s/ | kubectl apply -f -
+
+if you want to deploy directly using kubectl then -> kubectl apply -k k8s/
+
+in the Kustomization yml file, you can specify apiVersion and kind but it is optional. for best practice mention it.
+
+common transformers:
+changes will apply to all the resources i.e if you want to target all resources then use common transformers
+
+common transformers are:
+1. commonLabel -> which is used to add label to the resources.
+2. namePrefix/nameSuffix -> which will be added to the name of the resource first and last.
+3. namespace -> which is used to add the namespace to the all resources.
+
+if you want to change the image then using image transformers we can do that. for suppose the existing image is nginx and 
+you want to change this image to sriraju12 then use this in Kustomization yaml file:
+
+images:
+  - name: nginx
+    newName: sriraju12
+
+ we can also just change the tag of the image:
+
+    images:
+      - name: nginx
+        newTag: sriraju12:v2    # tags needs to be placed in double qoutes.
+
+if you want to change both then:
+ 
+   images:
+     - name: nginx
+       newName: sriraju12
+       newTag: "v2"  # tags needs to be placed in double qoutes.
+
+
+
+Patches:
+if you want to apply the changes to specific resources i.e if you want to target specific resources then use patches.
+
+to create the patch, you need to specify 3 parameters:
+they are: 1. operation type - add/remove/replace
+          2. target - need to mention the target that patch will apply on
+          3. value - what value needs to be added/replace(for remove you don't need to specify the value parameter)
+
+example:
+1.if you want to change the deployment name then use this:
+
+patches:
+  - target:
+    kind: deployment
+    name: my-deployement
+
+    patch: |-  # This is inline patch
+      - op: replace
+        path: /metadata/name
+        value: my-nginx-deployement
+
+The above patch is called json 6902 patch. Another way is there that is, strategic merge patch.
+In strategic merge patch, you need to copy the resource yaml file configuration upto where you need to change and 
+update the value. that's it. sample is below:
+
+patches:
+  - patch: |-
+      apiVersion: apps/v1
+      kind: Deployment 
+      metadata:
+        name: my-nginx-deployement  # This is simple way
+
+
+patches can be done using inline and file:
+the above we have used inline patch, now let's see how to use file:
+
+patches:
+  - name-patch.yaml
+
+
+
+name-patch.yaml:
+
+apiVersion: apps/v1
+kind: Deployment 
+metadata:
+  name: my-nginx-deployement
+
+
+2. if you want to add the label in pod yaml then use this:
+
+patches:  # using inline patch json 6902 patch
+  - target:
+    apiVersion: apps/v1
+    kind: Deployment
+
+    patch: |-
+      - op: add
+        path: /spec/template/metadata/labels/tier
+        value: frontend
+
+
+using file patch strategic merge patch:
+
+patches:
+  - pod-label-patch.yaml
+
+pod-label-patch.yaml:
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nginx-deployment
+  template:
+    labels:
+      app: nginx-deployment
+
+
+
+
+
+
+

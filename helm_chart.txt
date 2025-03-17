@@ -1,0 +1,83 @@
+HELM:
+
+Helm is a package manager for kubernetes. it is used to build, deploy and manage application easily.
+
+problems without helm:
+1. defining/managing and executing multiple manifest file.
+2. deployment ordering challenges
+3. versioning and rollbacks for all resources.
+4. environment-specific configuration files.
+
+the above problems are resolved using helm.
+
+helm chart can be created in two ways:
+1. manually you can create the folder
+2. using helm command
+
+command to create the helm chart - helm create my-chart(chart_name)
+
+if you want to see the structure of the helm chart then after creating it, go inside the helm chart and run tree 
+command to the folder structure present in it but before that install the tree.
+
+the files present in the helm chart is:
+1. chart.yml - which contains the metadata about the project
+2. charts - which contains the dependency information
+3. templates -  which contains the manifest yaml files written in ginjar templates.
+4. values.yml - which is used to pass values to the yaml file that are present in the template folder.
+5. notes.txt - it is used to follow the instructions when the helm chart is deployed in k8s cluster
+               for example: if you want to get the application url after the chart is deployed then that
+               command is mentioned here.
+6. helpers.tpl - which is used for reusable functions.
+
+in the template yml files, they are 3 types of variables are present:
+1. release - while deploying the helm chart, whatever name is given that name is taken here.
+2. chart -  this values are coming from chart.yml file.
+3. values - this values are coming from the values.yml file.
+
+command to deploy the helm chart - helm install my-deployment .(path of helm chart here current directory) -n dev
+
+command to list the helm deployments - helm list
+
+if you have modified the helm chart and you want to apply the changes, command is - helm upgrade name_of_deployment path_of_helm_chart -n namespace_name
+
+if you want to rollback to the specific version, command is - helm rollback name_of_deployment revision_number -n namespace_name
+
+if you want to change some values in values.yml, but you don't want to go and modify in the helm chart then 
+use this command - helm upgrade name_of_deployment path_of_helm_chart --set replicaCount=2 -n namespace_name
+
+if you want to delete the helm_chart deployment, command is  - helm uninstall name_of_deployment -n namespace_name
+i.e it will delete all the resources.
+
+How to deploy helm chart to different environment:
+
+   you create the separate values.yml file for each environment and while deploying the helm chart pass that 
+   environment specific values.yml file.
+   command is - helm install name_of_deployment path_of_helm_chart -f name_of_values.yml file -n namespace_name
+
+
+command to package the helm chart - helm package name_of_helm_chart
+i.e it will be packaged and you can upload anywhere and anyone can access it. basically it package as .tgz
+
+
+NOTE:
+https://artifacthub.io -> website for helm packages.
+
+if you want to override the values.yml file values in commandline while deploying the helm chart then use -- set.
+and then name that is mentioned in the values.yml file and it's value.
+
+command -> helm install --set replicaCount=4 my-deployment .
+
+if you have too many values then you can create yaml file and then pass it to helm command.
+
+custom-values.yml:
+
+replicaCount: 4
+Name: my-Deployment
+
+command ->  helm install --values custom-values.yml my-deployment .
+
+if you want to download the helm chart from anysource -> helm pull helm_chart_name
+it will download as tar file, you need to untar it -> helm pull --untar name_of_helm_chart
+
+
+

@@ -1,0 +1,232 @@
+Node Exporter:
+
+Collects system-level metrics from a machine (CPU, memory, disk, network, etc.). Used for monitoring hardware 
+and OS-level performance. Runs as an agent on the machine.
+Example metrics: CPU usage, disk space, network traffic.
+
+Blackbox Exporter:
+
+Blackbox Exporter is a tool for monitoring network services in Prometheus. It checks if websites, APIs, and 
+servers are reachable and working. It supports HTTP, TCP, ICMP (ping), and DNS probes. It measures response time,
+SSL validity, port availability, and DNS resolution. It helps detect downtime and performance issues in network
+services.
+
+these configuration needs to be added in the prometheus yml to scrape the metrics from the blackbox exporter:
+
+
+  - job_name: 'blackbox'
+    metrics_path: /probe
+    params:
+      module: [http_2xx]  # Probing method (HTTP status 2xx expected)
+    static_configs:
+      - targets:
+          - "https://example.com"  # Website name or service to check
+          - "http://my-api.com/health"
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115  # Blackbox Exporter service address i.e IP addres
+
+
+# Prometheus
+installed prometheus locally in mac. -> brew install prometheus
+to start prometheus -> brew services start prometheus
+prometheus url: http://localhost:9090
+
+configuration file of prometheus will find in this location -> /opt/homebrew/etc/
+in this location prometheus.yml file is present and if you want to scrap metrics from node exporter then you need to add configuration here.
+to scrap metrics from jenkins, then first you need to download the prometheus metrics plugin in jenkins to generate the metrics.
+to see the metrics of jenkins -> http://localhost:8080/prometheus 
+
+cd into /opt/homebrew/etc/ and vim prometheus.yml and add below jobs to scrap metrics from jenkins and node exporter.
+
+- job_name: 'node_exporter'
+  static_configs:
+    - targets: ["localhost:9100"]
+
+- job_name: 'jenkins'
+  metrics_path: '/prometheus'
+  static_configs:
+    - targets: ["localhost:8080"]
+
+to check syntax for prometheus yml -> promtool check config prometheus.yml
+after prometheus yml is edited then you need to restart the prometheus to apply the changes -> brew services restart prometheus
+you check the prometheus targets -> http://localhost:9090/targets
+
+go to grafana, click on datasource and then select prometheus and then give url of the prometheus.
+go to dashboards and then we need to add dashboards for jenkins and node exporter.
+
+for node expoter:
+click on the '+' icon on right top and then click on import dashboard.
+need to know the number for node exporter in grafana dashboard which 1860.
+and also select the prometheus that we have added.
+save the dashboard.
+
+for jenkins:
+click on the '+' icon on right top and then click on import dashboard.
+need to know the number for jenkins in grafana dashboard which 9964.
+and also select the prometheus that we have added.
+save the dashboard.
+
+# Node exporter
+to install node exporter -> brew install node_exporter
+to start node_exporter -> brew services start node_exporter
+node_exporter url: http://localhost:9100
+
+
+# Grafana
+to install grafana -> brew install grafana
+to start grafana -> brew services start grafana
+grafana url: http://localhost:3000
+username: admin
+password: admin
+once you login, it will ask to change the password.
+
+# Monitor Kubernetes with Prometheus
+
+Prometheus is a powerful monitoring and alerting toolkit, and you'll use it to monitor your Kubernetes cluster. Additionally, you'll install the node exporter using Helm to collect metrics from your cluster nodes.
+
+Install Node Exporter using Helm:
+
+To begin monitoring your Kubernetes cluster, you'll install the Prometheus Node Exporter. This component allows you to collect system-level metrics from your cluster nodes. Here are the steps to install the Node Exporter using Helm:
+
+Add the Prometheus Community Helm repository:
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+
+Create a Kubernetes namespace for the Node Exporter:
+kubectl create namespace prometheus-node-exporter
+
+Install the Node Exporter using Helm:
+helm install prometheus-node-exporter prometheus-community/prometheus-node-exporter --namespace prometheus-node-exporter
+
+Add a Job to Scrape Metrics on nodeip:9001/metrics in prometheus.yml:
+
+Update your Prometheus configuration (prometheus.yml) to add a new job for scraping metrics from nodeip:9001/metrics. You can do this by adding the following configuration to your prometheus.yml file:
+
+  - job_name: 'k8s'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ["172.18.0.3:9100"]
+Replace 'your-job-name' with a descriptive name for your job. The static_configs section specifies the targets to scrape metrics from, and in this case, it's set to nodeip:9001.
+
+Don't forget to reload or restart Prometheus to apply these changes to your configuration.
+And also need to deploy this service in cluster because it exposes the node exporter to outside so that prometheus will scrap for that metrics.
+
+ kind: Service
+apiVersion: v1
+metadata:
+  name: node-exporter
+  namespace: prometheus-node-exporter
+spec:
+  selector:
+      app: node-exporter
+  ports:
+  - name: node-exporter
+    protocol: TCP
+    port: 9100
+    targetPort: 9100
+  type: NodePort
+
+
+Alert Manager:
+in order to set alert, we need to write the rules for failure to which scenario do we want to get notified.
+we set rules in prometheus, then whenever it fails then prometheus sends alert to the alert manager and alert manager sends notifications to emails/slack.
+prometheus only checks the rules and alert manager manages the entire life cycle.
+in alert manager yml, we need to define the targets(emails/slack) to get notified.
+
+
+Prometheus, Grafana and Alert Manager using Helm:
+1. Install Prometheus through helm chart, so it will automatically installs the alert manager, node exporter,
+   kube-state metrics.
+2. For grafana you need to install separately through helm.
+3. For alert manager, first we need to define the rules for failed scenaries such as when node is down or
+   pod crashes etc. These details need to defines in prometheus.yml file.
+4. To send notification such as email or slack then you need to search for alert-manager configmap.
+   you need to edit that alert-manager configmap and write the targets for notifications(Email/Slack).
+5. To access the Prometheus, Grafana and Alert-manager dashboard in UI. You can use two Ways:
+   They are: 1. Do the port-forwarding for the services.
+             2. Expose the those services to NodePort or LoadBalancer type.
+
+Below are the sample rules that needs to define in prometheus.yml file,
+
+- name: NodeDown
+        rules:
+        # Alert for any instance that is unreachable for >5 minutes.
+        - alert: InstanceDown
+          expr: up{job="kubernetes-nodes"} == 0
+          for: 2m
+          labels:
+            severity: page
+          annotations:
+            host: "{{ $labels.kubernetes_io_hostname }}"
+            summary: "Instance down"
+            description: "Node {{ $labels.kubernetes_io_hostname  }}has been down for more than 5 minutes."
+      - name: low_memory_alert
+        rules:
+        - alert: LowMemory
+          expr: (node_memory_MemAvailable_bytes /  node_memory_MemTotal_bytes) * 100 < 85
+          for: 2m
+          labels:
+            severity: warning
+          annotations:
+            host: "{{ $labels.kubernetes_node  }}"
+            summary: "{{ $labels.kubernetes_node }} Host is low on memory.  Only {{ $value }}% left"
+            description: "{{ $labels.kubernetes_node }}  node is low on memory.  Only {{ $value }}% left"
+        - alert: KubePersistentVolumeErrors
+          expr: kube_persistentvolume_status_phase{job="kubernetes-service-endpoints",phase=~"Failed|Pending"} > 0
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            description: The persistent volume {{ $labels.persistentvolume }} has status {{ $labels.phase }}.
+            summary: PersistentVolume is having issues with provisioning.
+        - alert: KubePodCrashLooping
+          expr: rate(kube_pod_container_status_restarts_total{job="kubernetes-service-endpoints",namespace=~".*"}[5m]) * 60 * 5 > 0
+          for: 2m
+          labels:
+            severity: warning
+          annotations:
+            description: Pod {{ $labels.namespace }}/{{ $labels.pod }} ({{ $labels.container }}) is restarting {{ printf "%.2f" $value }} times / 5 minutes.
+            summary: Pod is crash looping.
+        - alert: KubePodNotReady
+          expr: sum by(namespace, pod) (max by(namespace, pod) (kube_pod_status_phase{job="kubernetes-service-endpoints",namespace=~".*",phase=~"Pending|Unknown"}) * on(namespace, pod)    group_left(owner_kind) topk by(namespace, pod) (1, max by(namespace, pod, owner_kind) (kube_pod_owner{owner_kind!="Job"}))) > 0
+          for: 2m
+          labels:
+            severity: warning
+          annotations:
+            description: Pod {{ $labels.namespace }}/{{ $labels.pod }} has been in a non-ready state for longer than 5 minutes.
+            summary: Pod has been in a non-ready state for more than 2 minutes.
+
+
+
+To receive alert to gmail then you need to add this in alert-manager configmap,
+
+global:
+      resolve_timeout: 1m
+      # slack_api_url: ''
+
+    receivers:
+    - name: 'gmail-notifications'
+      email_configs:
+      - to: example@gmail.com 
+        from: example@gmail.com # Update your from mail id here
+        smarthost: smtp.gmail.com:587
+        auth_username: example@gmail.com # Update your from mail id here
+        auth_identity: example@gmail.com # Update your from mail id here
+        auth_password: password # Update your app-password here
+        send_resolved: true
+        headers:
+          subject: " Prometheus -  Alert  "
+        text: "{{ range .Alerts }} Hi, \n{{ .Annotations.summary }}  \n {{ .Annotations.description }} {{end}} "
+        # slack_configs:
+        #  - channel: '@you'
+        #    send_resolved: true
+
+    route:
+      group_wait: 10s
+      group_interval: 2m
+      receiver: 'gmail-notifications'
+      repeat_interval: 2m
