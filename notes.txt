@@ -1979,6 +1979,89 @@ inorder to implement Gateway API, the following things need to do:
 
 
 
+TROUBELSHOOTING:
+
+Application Failures:
+
+for application failures, check the logs of the pod and the service and also describe the pod, service to know
+more details of the failure.
+
+command -> kubectl describe pod pod_name -n namespace_name,  kubectl logs pod_name -n namespace_name
+
+while troubleshooting the application failure, make sure to check the environmental variable, port number,
+selector field(for matching labels) carefully.
+
+Control Plane Failure:
+
+first check the nodes -> kubectl get nodes(where the they ready or not)
+then check the control plane pods in kube-system namespace -> kubectl get pods -n kube-system
+
+if control plane components are deployed as services then use this commands -> service kube-apiserver status
+to check the health of the service. i.e service kubelet status, check for all components. 
+
+next check the logs of the control plane components -> kubectl logs kube-apiserver-master -n kube-system
+
+if you have deployed control plane via services then to check the logs use this command -> sudo journalctl -u kube-apiserver
+
+while troubleshooting the control plan components, first check the nodes and then check pods whether running or not.
+if anyone is not running then check the logs and describe on that pod. if any misconfiguration is present then
+modify that yaml that is present in the location /etc/kubernetes/manifests/
+
+if you try to scale the deployment to 2, then it is not scaled and it is pending state then make sure to check
+logs and describe on the pods and deployment and also check the control plane components pods.
+
+
+Worker Nodes Failures:
+
+first check whether the nodes are ready or not. if not then describe on the node and then ssh into the node
+try to restart the kubelet.
+
+
+
+Advanced Kubectl commands using JSON PATH:
+JSON path is used to filter the data i.e if you want to see the image of the pod then no direct command is there
+to print this.
+
+how to use JSON PATH using kubectl:
+1. first identity the kubectl command 
+2. add -o json to the kubectl command to display the kubectl command in json format.
+3. write the json path query i.e if you want to see the image name then use this:
+
+  .items[0].spec.containers[0].image  -> items is list and also containers is also list.
+
+4. combine this two commands -> kubectl get pods -o=jsonpath='{ .items[0].spec.containers[0].image }'
+
+
+examples:
+
+if you want to print the node names then use this -> kubectl get nodes -o=jsonpath='{ .items[*].metadata.name }'
+
+
+.items[*]status.images[*].nodeInfo.osImage
+
+
+if you want to print the output in custom columns like 
+ 
+ name           cpu
+ controlplane    2
+ node01          3   like this then you need to use custom coloum.
+
+ syntax: kubectl command -o=custom-columns=column_names:jsonpath
+
+ example:
+ if you want to print the node names then
+   
+   -> kubectl get nodes -o=custom-columns=NodeName:.metadata.name
+
+ if you want both node name and cpu then
+
+   -> kubectl get nodes -o=custom-columns=NodeName:.metadata.name,CPU:.status.capacity.cpu
+
+kubectl -n admin2406 get deployment -o custom columns=DEPLOYMENT:.metadata.name,CONTAINER_IMAGE:.spec.template.spec.containers[].image,READY_REPLICAS:.status.readyReplicas,NAMESPACE:.metadata.namespace --sort-by=.metadata.name > /opt/admin2406_data
+
+
+
+
 
 
 
