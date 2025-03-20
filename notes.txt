@@ -1975,7 +1975,7 @@ Gateway API is an official Kubernetes project focused on layer four and layer-se
 inorder to implement Gateway API, the following things need to do:
 1. need to deploy the gateway controller like nginx(it is just like ingress controller).
 2. need to write the gateway yml i.e it Defines entry point for external traffic.
-3. need to write the virtual service yml i.e it Routes requests to backend services.
+3. need to write the HTTPRoute yml i.e it Routes requests to backend services.
 
 
 
