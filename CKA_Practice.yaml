@@ -1,0 +1,1412 @@
+# Pod
+apiVersion: v1 
+kind: Pod
+metadata:
+  name: my-pod
+  labels:
+    app: myapp
+spec:
+  containers:
+    - name: my-nginx-container
+      image: nginx
+      ports:
+        - containerPort: 80
+# imperative commmand: kubectl run my-pod --image=nginx --restart=Never --dry-run=client -o yaml > pod2.yaml
+# kubectl get pods --selector tier=frontend
+
+---
+
+# Replicaset
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: my-replicaset
+  labels:
+    app: frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+        - name: nginx-container
+          image: nginx
+          ports:
+            - containerPort: 80
+
+# imperative commmand: kubectl create replicaset my-replicaset --image=nginx --replicas=1 --dry-run=client -o yaml > replicaset1.yaml
+# kubectl get replicaset --selector tier=frontend
+# kubectl scale rs my-replicaset --replicas=2
+
+---
+
+# Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-deployment
+  labels:
+    app: frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+        - name: nginx-container
+          image: nginx
+          ports:
+            - containerPort: 80
+
+# imperative commmand: kubectl create deployment my-deployment --image=nginx --replicas=1 --dry-run=client -o yaml > deployment1.yaml
+# kubectl get deployment --selector tier=frontend
+# kubectl scale deployment my-deployment --replicas=2
+# kubectl set image deployment my-deployment nginx=nginx:latest   i.e here nginx is container name
+# kubectl rollout undo deployment my-deployment i.e rollback to previous version
+# kubectl rollout history deployment my-deployment i.e to see the history of deployment
+# kubectl expose deployment my-deployment --port=80 --target-port=8080 --type=LoadBalancer  i.e to expose the deployment
+
+---
+# Service
+
+# clusterIP
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-service
+spec:
+  type: ClusterIP
+  selector:
+    app: my-app
+  ports:
+    - protocol: TCP
+      port: 80         # Service port
+      targetPort: 8080  # Container port
+
+---
+# nodeport
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-service
+spec:
+  type: NodePort
+  selector:
+    app: my-app
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8080
+      nodePort: 30080  # nodeport range (30000-32767)
+
+---
+# LoadBalancer
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-service
+spec:
+  type: LoadBalancer
+  selector:
+    app: frontend
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8080
+
+# kubectl expose deployment my-deployment --port=80 --target-port=8080 --type=NodePort --name=my-service
+# kubectl expose pod my-pod --port=80 --target-port=8080 --type=ClusterIP --name=my-service --dry-run=client -o yaml > service.yaml
+# kubectl get svc --selector app=my-app
+
+---
+# Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: dev-ns
+
+# imperative commmand: kubectl create namespace dev-ns
+
+---
+# ResourceQuota
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: my-resource-quota
+  namespace: dev-ns
+spec:
+  hard:
+    pods: "5"
+    requests.cpu: "1"
+    requests.memory: "1Gi"
+    limits.cpu: "2"
+    limits.memory: "2Gi"
+
+# imperative commmand: kubectl create resourcequota my-resource-quota --hard pod=5,requests.cpu=1,requests.memory=1Gi,limits.cpu=2,limits.memory=2Gi -n dev-ns
+
+---
+
+# if you want to manually schedule a pod in the node
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: my-pod
+  labels:
+    tier: frontend
+spec:
+  nodeName: node01
+  containers:
+    - name: nginx-container
+      image: nginx
+      ports:
+        - containerPort: 80
+
+---
+# taints and tolerations
+
+# add taints to node
+# kubectl taint nodes node01 color=black:NoSchedule
+
+# remove taints to node
+# kubectl taint nodes node01 color=black:NoSchedule-
+
+# add tolerations to pod
+apiVersion: v1
+kind: Pod
+metadata:
+  name: my-pod
+  labels:
+    tier: frontend
+spec:
+  tolerations:
+    - key: "color"
+      operator: "Equal"
+      value: "black"
+      effect: "NoSchedule"
+  containers:
+    - name: nginx-container
+      image: nginx
+      ports:
+        - containerPort: 80
+
+
+---
+# node selector
+
+# add label to node: kubectl label nodes node01 size=Large
+# remove label to node: kubectl label nodes node01 size-
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: my-pod
+  labels:
+    tier: frontend
+spec:
+  nodeSelector:
+    size: Large
+  containers:
+    - name: nginx-container
+      image: nginx
+      ports:
+        - containerPort: 80
+
+---
+# node affinity
+
+# label the node: kubectl label nodes node01 size=Large
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: my-pod
+  labels:
+    tier: frontend
+spec:
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: size
+                operator: In
+                values:
+                  - Large
+  containers:
+    - name: nginx-container
+      image: nginx
+      ports:
+        - containerPort: 80
+
+
+---
+# resource requests and limits
+apiVersion: v1
+kind: Pod
+metadata:
+  name: my-pod
+  labels:
+    tier: frontend
+spec:
+  containers:
+    - name: nginx-container
+      image: nginx
+      ports:
+        - containerPort: 80 
+      resources:
+        requests:
+          cpu: "250m"     # Requests 250 millicores (0.25 CPU)
+          memory: "256Mi" # Requests 256 MB of RAM
+        limits:
+          cpu: "500m"     # Limits to 500 millicores (0.5 CPU)
+          memory: "512Mi" # Limits to 512 MB of RAM
+
+---
+# daemonset
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: my-daemonset
+  labels:
+    app: my-daemonset
+spec:
+  selector:
+    matchLabels:
+      app: my-daemonset
+  template:
+    metadata:
+      labels:
+        app: my-daemonset
+    spec:
+      containers:
+        - name: nginx
+          image: nginx
+          ports:
+            - containerPort: 80
+
+# imperative commmand: kubectl create daemonset my-daemonset --image=nginx --dry-run=client -o yaml > daemonset1.yaml
+# kubectl get daemonset --selector app=my-daemonset
+
+---
+# if you place the pod configuration file in the directory called /etc/kubernetes/manifests/ then it will be created automatically.
+
+---
+# monitoring(using metrics server): first download the metrics server
+
+# kubectl top nodes i.e to see the cpu and memory usage of nodes
+# kubectl top pods i.e to see the cpu and memory usage of pods
+# kubectl top pod -n my-namespace i.e to see the cpu and memory usage of pods in the namespace
+# kubectl top pod my-pod -n my-namespace i.e to see the cpu and memory usage of specific pod in the namespace
+
+---
+# how to include rolling update strategy in deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-deployment
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1       # Allows 1 extra pod during update
+      maxUnavailable: 1  # Takes down 1 pod at a time
+  selector:
+    matchLabels:
+      app: my-app
+  template:
+    metadata:
+      labels:
+        app: my-app
+    spec:
+      containers:
+        - name: my-container
+          image: nginx:latest
+          ports:
+            - containerPort: 80
+
+
+---
+# how to include recreate strategy in deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-deployment
+spec:
+  replicas: 3
+  strategy:
+    type: Recreate  # Deletes all old pods before creating new ones
+  selector:
+    matchLabels:
+      app: my-app
+  template:
+    metadata:
+      labels:
+        app: my-app
+    spec:
+      containers:
+        - name: my-container
+          image: nginx:latest
+          ports:
+            - containerPort: 80
+
+
+---
+# rolling updates and rollback in deployment
+
+# kubectl set image deployment my-deployment my-container=nginx:1.19  i.e to update the image
+# kubectl rollout status deployment my-deployment i.e to see the status of rollout
+# kubectl rollout history deployment my-deployment i.e to see the history of deployment
+# kubectl rollout undo deployment my-deployment i.e to rollback to previous version
+# kubectl rollout undo deployment my-deployment --to-revision=2 i.e to rollback to specific version
+
+---
+# environmental variables
+
+
+
+# env:
+#   - name: color 
+#     value: blue
+#   - name: username
+#     value: sriraju12
+
+---
+# ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: my-config
+data:
+  database_url: "mysql://db-host:3306"
+  log_level: "debug"
+
+# imperative commmand: kubectl create configmap my-config --from-literal database_url=mysql://db-host:3306 --from-literal log_level=debug
+
+---
+# how to add configmap to pod as environmental variables i.e add all configmap data to pod at a time
+apiVersion: v1 
+kind: Pod
+metadata:
+  name: my-pod
+  labels:
+    app: myapp
+spec:
+  containers:
+    - name: my-nginx-container
+      image: nginx
+      ports:
+        - containerPort: 80
+      envFrom:
+        - configMapRef:
+            name: my-config
+
+---
+# how to add configmap to pod as environmental variables i.e add specific value configmap data to pod
+apiVersion: v1 
+kind: Pod
+metadata:
+  name: my-pod
+  labels:
+    app: myapp
+spec:
+  containers:
+    - name: my-nginx-container
+      image: nginx
+      ports:
+        - containerPort: 80
+      env:     
+        - name: DATABASE_URL
+          valueFrom:
+            configMapRef:
+              name: my-config
+              key: database_url
+
+---
+# how to add configmap to pod as volume
+apiVersion: v1 
+kind: Pod
+metadata:
+  name: my-pod
+  labels:
+    app: myapp
+spec:
+  volumes:
+    - name: my-volume
+      configMap: 
+        name: my-config
+  containers:
+    - name: my-nginx-container
+      image: nginx
+      ports:
+        - containerPort: 80
+      volumeMounts:
+        - name: my-volume
+          mountPath: /etc/config
+
+---
+# secrets
+apiVersion: v1
+kind: Secret
+metadata:
+  name: my-secret
+type: Opaque
+data:
+  username: dXNlcm5hbWU=  # Base64 encoded value of "username"
+  password: cGFzc3dvcmQ=  # Base64 encoded value of "password"
+
+# kubectl create secret generic my-secret --from-literal username=username --from-literal password=password
+
+---
+# how to add secrets to pod as environmental variables i.e add all secrets data to pod at a time
+apiVersion: v1 
+kind: Pod
+metadata:
+  name: my-pod
+  labels:
+    app: myapp
+spec:
+  containers:
+    - name: my-nginx-container
+      image: nginx
+      ports:
+        - containerPort: 80
+      envFrom:  
+        - secretRef:
+          name: my-secret
+
+---
+# how to add secrets to pod as environmental variables i.e add specific value secrets data to pod
+
+apiVersion: v1 
+kind: Pod
+metadata:
+  name: my-pod
+  labels:
+    app: myapp
+spec:
+  containers:
+    - name: my-nginx-container
+      image: nginx
+      ports:
+        - containerPort: 80
+      env:     
+        - name: USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: my-secret
+              key: username
+
+---
+# how to add secrets to pod as volume
+apiVersion: v1 
+kind: Pod
+metadata:
+  name: my-pod
+  labels:
+    app: myapp
+spec:
+  volumes:
+    - name: my-volume
+      secret:  
+        secretName: my-secret
+  containers:
+    - name: my-nginx-container
+      image: nginx
+      ports:
+        - containerPort: 80
+      volumeMounts:
+        - name: my-volume
+          mountPath: /etc/config
+
+
+---
+# HPA(Horizontal Pod Autoscaler)
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: my-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: my-deployment   # Target deployment to scale
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 50  # Scale if CPU usage > 50%
+
+# kubectl autoscale deployment my-deployment --cpu-percent=50 --min=2 --max=10
+
+
+
+---
+# VPA(Vertical Pod Autoscaler)
+# bydefault VPA is not installed, we need to install manually
+
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: my-vpa
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: my-deployment   # Target deployment to scale
+  updatePolicy:
+    updateMode: Auto  # Options: "Auto", "Off", "Initial"
+  resourcePolicy:
+    containerPolicies:
+      - containerName: '*'
+        minAllowed:
+          cpu: "250m"
+          memory: "256Mi"
+        maxAllowed:
+          cpu: "2"
+          memory: "2Gi"
+
+---
+# Role  i.e it is scoped to a single namespace
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: pod-reader
+  namespace: dev-ns
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "watch", "list"]
+
+# kubectl create role pod-reader --verb=get,list,watch --resource=pods --namespace dev-ns
+
+---
+# RoleBinding i.e it binds a role to a user or a group or service account. Here attachig to user
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: pod-reader-binding
+  namespace: dev-ns
+subjects:
+  - kind: User
+    name: sriraju  
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: Role
+  name: pod-reader
+  apiGroup: rbac.authorization.k8s.io
+
+# kubectl create rolebinding pod-reader-binding --role=pod-reader --user=my-user --namespace dev-ns 
+
+---
+# RoleBinding i.e attaching to service account
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: pod-reader-binding
+  namespace: dev-ns 
+subjects:
+  - kind: ServiceAccount
+    name: my-service-account  
+    namespace: dev-ns 
+roleRef:
+  kind: Role
+  name: pod-reader  
+  apiGroup: rbac.authorization.k8s.io
+
+
+---
+# ClusterRole i.e it is scoped to the entire cluster
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: pod-reader-clusterrole
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "watch", "list"]
+
+# kubectl create clusterrole pod-reader-clusterrole --verb=get,list,watch --resource=pods
+
+
+---
+# ClusterRoleBinding i.e it binds a clusterrole to a user or a group or service account. Here attachig to user
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: pod-reader-clusterrolebinding
+subjects:
+  - kind: User
+    name: sriraju   
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: ClusterRole
+  name: pod-reader-clusterrole
+  apiGroup: rbac.authorization.k8s.io
+
+ # kubectl create clusterrolebinding pod-reader-clusterrolebinding --clusterrole=pod-reader-clusterrole --user=my-user
+
+
+---
+# ClusterRoleBinding i.e attaching to service account
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: sa-clusterrolebinding
+subjects:
+  - kind: ServiceAccount
+    name: my-service-account
+    namespace: dev-ns  
+roleRef:
+  kind: ClusterRole
+  name: pod-reader-clusterrole
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# service account
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: my-service-account
+  namespace: dev-ns
+
+# kubectl create serviceaccount my-service-account -n dev-ns
+
+---
+# security context i.e if you add security context at pod level then it will override the security context at container level.
+# security context can also add at container level.
+# we can add user privileges, linux capabilities. Let's see both, now let see user privileges.
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: secure-pod
+spec:
+  securityContext:
+    runAsUser: 1000         # Runs the Pod as user ID 1000
+    runAsGroup: 3000        # Group ID 3000
+    fsGroup: 2000           # Files created will belong to this group
+  containers:
+    - name: secure-container
+      image: nginx
+      
+---
+# security context i.e linux capabilities      
+apiVersion: v1
+kind: Pod
+metadata:
+  name: secure-container-pod
+spec:
+  containers:
+    - name: secure-container
+      image: nginx
+      securityContext:
+        runAsUser: 1000           # Runs as user ID 1000
+        capabilities:
+          add: ["NET_ADMIN"]       # Adds Linux capability NET_ADMIN
+          drop: ["ALL"]            # Drops all other capabilities
+        readOnlyRootFilesystem: true  # Makes root filesystem read-only
+
+---
+# network policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-my-app
+spec:
+  podSelector:
+    matchLabels:
+      app: my-app  # here need to mention pod that need to be applied network policy
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              role: backend  # here need to mention the pod that need to be allowed to access my-app
+
+          namespaceSelector: # here need to mention the namespace that need to be allowed to access my-app
+            matchLabels:
+            name: prod
+
+        - ipBlock:  # here need to mention the ip that need to be allowed to access my-app
+            cidr: 192.168.5.10/12
+      ports:
+        - protocol: TCP
+          port: 3306
+
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 192.168.5.10/12 # here we can not use podSelector and namespaceSelector because webserver is present outside the cluster.
+      ports:
+        - protocol: TCP
+          port: 80  # web server port  
+
+# imperative commmand: kubectl create networkpolicy allow-ingress-to-my-app --pod-selector=app=my-app --ingress-from=podSelector=role=backend,namespaceSelector=name=prod,ipBlock=192.168.5.10/12 --port=3306 --egress-to=ipBlock=192.168.5.10/12 --port=80
+
+---
+# PV(Persistent Volume)
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: aws-pv
+spec:
+  capacity:
+    storage: 5Gi  
+  accessModes:
+    - ReadWriteOnce  
+  persistentVolumeReclaimPolicy: Retain  # Keeps the volume after PVC is deleted
+  storageClassName: manual
+  awsElasticBlockStore:
+    volumeID: vol-0abcd1234efgh5678  # Replace with your actual EBS volume ID
+    fsType: ext4
+
+# imperative commmand: kubectl create pv aws-pv --capacity=5Gi --access-mode=ReadWriteOnce --reclaim-policy=Retain --storage-class=manual --aws-ebs-volume-id=vol-0abcd1234efgh5678 --fs-type=ext4 --dry-run=client -o yaml > pv.yaml
+
+---
+# PVC(Persistent Volume Claim)
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: aws-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: manual  # Must match the PV's storage class
+
+# imperative commmand: kubectl create pvc aws-pvc --access-mode=ReadWriteOnce --storage=5Gi --storage-class=manual --dry-run=client -o yaml > pvc.yaml
+
+---
+# attach PVC to pod
+apiVersion: v1
+kind: Pod
+metadata:
+  name: aws-pod
+spec:
+  volumes:
+    - name: aws-storage
+      persistentVolumeClaim:
+        claimName: aws-pvc
+  containers:
+    - name: my-container
+      image: nginx
+      volumeMounts:
+        - mountPath: "/usr/share/nginx/html"
+          name: aws-storage
+
+---
+# StorageClass
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: aws-sc
+provisioner: kubernetes.io/aws-ebs  # AWS EBS provisioner
+parameters:
+  type: gp2  # Change to gp3 for better performance
+  fsType: ext4
+reclaimPolicy: Retain  # Options: Delete | Retain | Recycle
+volumeBindingMode: WaitForFirstConsumer
+
+# kubectl create storageclass aws-sc --provisioner=kubernetes.io/aws-ebs --parameters=type=gp2,fsType=ext4,reclaimPolicy=Retain,volumeBindingMode=WaitForFirstConsumer
+
+---
+# PVC for dynamic provisioning(StorageClass)
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pvc-with-sc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: aws-sc  # Reference the StorageClass
+
+# kubectl create pvc pvc-with-sc --access-mode=ReadWriteOnce --storage=5Gi --storage-class=aws-sc --dry-run=client -o yaml > pvc.yaml
+
+
+---
+# Attach PVC to pod
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-with-sc
+spec:
+  volumes:
+    - name: sc-storage
+      persistentVolumeClaim:
+        claimName: pvc-with-sc
+  containers:
+    - name: nginx
+      image: nginx
+      volumeMounts:
+        - mountPath: "/usr/share/nginx/html"
+          name: sc-storage
+
+---
+# Ingress resource i.e host based routing
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  rules:
+    - host: my-app.example.com  # Change this to your domain
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: my-service  # Target service name
+                port:
+                  number: 80
+
+---
+# gateway api resource
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: my-gateway
+  namespace: default
+spec:
+  gatewayClassName: nginx  # Change this based on the installed GatewayClass
+  listeners:
+    - name: http
+      protocol: HTTP
+      port: 80
+      allowedRoutes:
+        namespaces:
+          from: Same
+
+---
+# HTTPRoute resource
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: my-httproute
+  namespace: default
+spec:
+  parentRefs:
+    - name: my-gateway
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: my-service-v1  # Primary service
+          port: 80
+          weight: 80  # 80% of traffic goes here
+        - name: my-service-v2  # Secondary service
+          port: 80
+          weight: 20  # 20% of traffic goes here
+
+#################################################################################################################
+
+---
+# CKA sample questions
+
+# 1. create a pod called secret-1401 in the admin1401 namespace using the busybox image. The container
+# within the pod should be called secret-admin and should sleep for 4800 seconds. 
+# The container should mount a read-only secret volume called secret-volume at the path /etc/secret-volume.
+# the secret being mounted has already been created for you and is called dotfile-secret.
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: secret-1401
+  namespace: admin1401
+spec:
+  volumes:
+    - name: secret-volume
+      secret:
+        secretName: dotfile-secret
+  containers:
+    - name: secret-admin
+      image: busybox
+      command:
+        - "sleep"
+        - "4800"
+      volumeMounts:
+        - name: secret-volume
+          mountPath: /etc/secret-volume
+          readOnly: true
+
+---
+# 2.create a new deployment called nginx-deploy,with image nginx:1.16 and 1 replica. Next, upgrade the
+# deployment to version 1.17 using rolliing update and add the annotation message updated nginx image to 1.17.
+
+# kubectl create deployment nginx-deploy --image=nginx:1.16 --replicas=1
+# kubectl set image deployment nginx-deploy nginx=nginx:1.17
+# kubectl annotate deployment nginx-deploy message="updated nginx image to 1.17"
+
+
+---
+# 3.deploy a messaging pod using the redis:alpine image with the labels set to tier=msg. 
+
+# kubectl run messaging --image=redis:alpine --labels tier=msg
+
+---
+# 4.create a service messaging-service to expose the messaging application within the cluster on port 6379.
+
+# kubectl expose pod messaging --name=messaging-service --port=6379 --target-port=6379 --type=ClusterIP
+
+---
+# 5.create a PV with the given specification: volume name: pv-analytics, storage: 100Mi, access modes: ReadWriteMany
+# Host path: /pv/data-analytics.
+
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-analytics
+spec:
+  capacity:
+    storage: 100Mi
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain  
+  hostPath:
+    - path: /pv/data-analytics
+
+# kubectl create pv pv-analytics --capacity=100Mi --access-modes=ReadWriteMany --hostpath=/pv/data-analytics
+
+---
+# 6.create a HPA with name webapp-hpa for the deployment named kkapp-deploy in the default namespace with the
+# webapp-hpa.yaml file located under the root folder. Ensure that the HPA scales the deployment based on
+# CPU Utilization, maintaining an average CPU usage of 50% across all pods.
+# configure the HPA to cautiously scale down pods by setting a stabilization window of 300 seconds.
+# to prevent rapid fluctuations in pod count. NOTE: The kkapp-deploy deployment is created for backend, you can check the terminal.
+
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: webapp-hpa
+  namespace: default
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: kkapp-deploy  # Target deployment
+  minReplicas: 1
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 50  
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300  # Prevent rapid scale-downs
+
+---
+# 7.create a kubernetes Gateway resource with the following specification. name: web-gateway, namespace: nginx-gateway, gatewayclassname: nginx,
+# listeners: name: http, protocol: HTTP, port: 80.
+
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: web-gateway
+  namespace: nginx-gateway
+spec:
+  gatewayClassName: nginx  # Ensure an appropriate GatewayClass is installed
+  listeners:
+    - name: http
+      protocol: HTTP
+      port: 80
+      allowedRoutes:
+        namespaces:
+          from: Same
+
+---
+# 8. create a new pod called super-user-pod with image busybox:1.28. Allow the pod to be able to set system_time.
+# the container should sleep for 4800 seconds.
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: super-user-pod
+spec:
+  containers:
+    - name: super-user-container
+      image: busybox:1.28
+      command:
+        - "sleep"
+        - "4800"
+      securityContext:
+        capabilities:
+          add: ["SYS_TIME"]
+
+---
+# 9. create a new deployment called nginx-deploy, with image nginx:1.16 and 1 replica. Next, upgrade the
+# deployment to version 1.17 using rolling update.
+
+# kubectl create deployment nginx-deploy --image=nginx:1.16 --replicas=1
+# kubectl set image deployment nginx-deploy nginx=nginx:1.17
+
+---
+# 10. deploy a VPA for the deployment named multi-container-deployment is the default namespace. 
+# This deployment consists of two containers, frontend and backend. configure the VPA to manage resource requests
+# for the backend-app container only, excluding the frontend-app container from automatic resource adjustments.
+
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: multi-container-vpa
+  namespace: default
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: multi-container-deployment
+  updatePolicy:
+    updateMode: Auto  
+  resourcePolicy:
+    containerPolicies:
+      - containerName: backend-app
+        mode: Auto  # VPA will manage this container
+      - containerName: frontend-app
+        mode: Off   # VPA will NOT manage this container
+
+---
+# 11. create an HTTPRoute resource named web-route in the default namespace. This route should direct traffic
+# from the web-gateway to a backend service named web-service on port 80. web-gateway is in the nginx-gateway
+# namespace. And service web-service and deployment web-app are in the default namespace.
+
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: web-route
+  namespace: default
+spec:
+  parentRefs:
+    - name: web-gateway
+      namespace: nginx-gateway  # The namespace of the gateway
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: web-service
+          port: 80
+
+---
+# 12. create a HPA for the deployment named api-deployment located in the api namespace. The HPA should scale
+# the deployment based on a custom metric named requests_per_second, targeting an average value of 1000 requests
+# per second across all pods. Set the minimum number of replicas to 1 and the maximum to 20. NOTE: deployment
+# api-deployment is available in api namespace.
+
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: api-hpa
+  namespace: api
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: api-deployment
+  minReplicas: 1
+  maxReplicas: 20
+  metrics:
+    - type: Object
+      object:
+        metric:
+          name: requests_per_second  # Custom metric
+        describedObject:
+          apiVersion: apps/v1
+          kind: Deployment
+          name: api-deployment
+        target:
+          type: Value
+          value: 1000 
+
+
+---
+# 13. create a VPA cache-vpa for a stateful application named cache-statefulset in the default namespace. The VPA
+# should set optimal CPU and memory requests for newly created pods while ensuring that existing pods are not
+# evicted. Please configure the VPA to operate in the Initial mode to achieve this behavior. NOTE: statefulset
+# cache-statefulset is already created.
+
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: cache-vpa
+  namespace: default
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: StatefulSet
+    name: cache-statefulset  # Target StatefulSet
+  updatePolicy:
+    updateMode: Initial  # Sets requests for new pods but does NOT update running pods
+
+
+
+#################################################################################################################
+
+---
+# 1.Reconfigure the existing deployment front-end and add a port specification named http exposing port 80/tcp of the existing container nginx.
+#Create a new service named front-end-svc exposing the container port http.
+#Configure the new service to also expose the individual Pods via a NodePort on the nodes on which they are scheduled.
+
+
+# 2.Set the node named ek8s-node-0 as unavailable and reschedule all the pods running on it.
+
+# kubectl drain node ek8s-node-0 --ignore-daemonsets
+
+# 3.Schedule a Pod as follows: Name: kucc8, App Containers: 2, Container Name/Images: nginx, consul
+   
+    apiVersion: v1
+    kind: Pod
+    metadata:
+      name: kucc8
+    spec:
+      containers:
+        - name: nginx
+          image: nginx
+        - name: consul
+          image: consul
+
+# 4. Check to see how many nodes are ready (not including nodes tainted NoSchedule) and write the number to /opt/KUSC00402/kusc00402.txt.
+
+  # kubectl get nodes --field-selector=status.conditions[?type==Ready,status==True] -o jsonpath='{.items[*].metadata.name}' | wc -w > /opt/KUSC00402/kusc00402.txt
+---
+# 5. Schedule a pod as follows: Name: nginx-kusc00401, Image: nginx, Node selector: disk=ssd
+   
+   apiVersion: v1
+   kind: Pod
+   metadata:
+     name: nginx-kusc00401
+   spec:
+     nodeSelector:
+       disk: ssd
+     containers:
+       - name: nginx
+         image: nginx
+
+---
+
+# 6. Scale the deployment presentation to 3 pods.
+
+  # kubectl scale deployment presentation --replicas=3
+
+# 7. cluster upgradation
+
+# 8. From the pod label name=overloaded-cpu, find pods running high CPU workloads and write the name of the pod
+# consuming most CPU to the file /opt/KUTR00401/KUTR00401.txt (which already exists).
+
+# kubectl top pod --selector name=overloaded-cpu --sort-by=cpu | tail -n 1 | awk '{print $1}' > /opt/KUTR00401/KUTR00401.txt
+
+# 9. Monitor the logs of pod foo and: Extract log lines corresponding to error file-not-found, Write them to /opt/KUTR00101/foo
+
+      #kubectl logs foo | grep "file-not-found" > /opt/KUTR00101/foo
+
+# 10. reate a new ClusterRole named deployment-clusterrole, which only allows to create the following resource types:
+# Deployment, Stateful Set, DaemonSet.Create a new ServiceAccount named cicd-token in the existing namespace app-team1.
+# Bind the new ClusterRole deployment-clusterrole to the new ServiceAccount cicd-token, limited to the namespace app-team1.
+
+# 11. Create a new nginx Ingress resource as follows:
+# Name: ping, Namespace: ing-internal, Exposing service hi on path /hi using service port 5678.
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ping
+  namespace: ing-internal
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /hi
+            pathType: Prefix
+            backend:
+              service:
+                name: hi
+                port:
+                  number: 5678
+
+---
+# 12. Create a new PersistentVolumeClaim:
+# Name: pv-volume,Class: csi-hostpath-sc, Capacity: 10Mi
+# Create a new Pod which mounts the PersistentVolumeClaim as a volume:
+# Name: web-server, Image: nginx, Mount path: /usr/share/nginx/html
+# Configure the new Pod to have ReadWriteOnce access on the volume. Finally, using kubectl edit or kubectl
+# patch expand the PersistentVolumeClaim to a capacity of 70Mi and record that change.     
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pv-volume
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Mi
+  storageClassName: csi-hostpath-sc
+
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: web-server
+spec:
+  containers:
+    - name: nginx
+      image: nginx
+      volumeMounts:
+        - name: storage-volume
+          mountPath: "/usr/share/nginx/html"
+  volumes:
+    - name: storage-volume
+      persistentVolumeClaim:
+        claimName: pv-volume
+
+
+# kubectl edit pvc pv-volume. Change the storage to 70Mi and save the file.
+
+---
+
+# 13. A Kubernetes worker node, named wk8s-node-0 is in state NotReady. Investigate why this is the case,
+# and perform any appropriate steps to bring the node to a Ready state, ensuring that any changes are made permanent
+
+
+
+# 14. Create a persistent volume with name app-data, of capacity 2Gi and access mode ReadOnlyMany.
+# The type of volume is hostPath and its location is /srv/app- data.
+
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: app-data
+spec:
+  capacity:
+    storage: 2Gi
+  accessModes:
+    - ReadOnlyMany
+  persistentVolumeReclaimPolicy: Retain
+  hostPath:
+    path: "/srv/app-data"
+
+---
+
+# 15. Create a new NetworkPolicy named allow-port-from-namespace in the existing namespace fubar.
+# Ensure that the new NetworkPolicy allows Pods in namespace internal to connect to port 9000 of Pods in namespace fubar.
+#Further ensure that the new NetworkPolicy:
+#does not allow access to Pods, which don't listen on port 9000,does not allow access from Pods, which are not in namespace internal
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-port-from-namespace
+  namespace: fubar
+spec:
+  podSelector:  # Selects only pods in `fubar` namespace
+    matchLabels: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: internal  # Allows traffic only from `internal` namespace
+      ports:
+        - protocol: TCP
+          port: 9000  # Only allows traffic on port 9000
+
+---
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+          
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+      
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+
