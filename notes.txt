@@ -354,7 +354,7 @@ kubectl run nginx --image=nginx
 
 Generate POD Manifest YAML file (-o yaml). Don't create it(--dry-run)
 
-kubectl run nginx --image=nginx --dry-run=client -o yaml
+kubectl run nginx --image=nginx --dry-run=client -o yaml > pod.yaml
 
 
 
@@ -365,7 +365,7 @@ kubectl create deployment --image=nginx nginx
 
 Generate Deployment YAML file (-o yaml). Don't create it(--dry-run)
 
-kubectl create deployment --image=nginx nginx --dry-run=client -o yaml
+kubectl create deployment --image=nginx nginx --dry-run=client -o yaml >  deployment.yaml
 
 Generate Deployment with 4 Replicas
 
@@ -457,7 +457,7 @@ taints and toleration does not tells a pod to go to particular node.
 
 kubectl describe node node01 | grep -i taints  -> to see whether the node is tainted or not.
 
-kubectl taint nodes controlplane node-role.kubernetes.io/control-plane:NoSchedule -> untaint the node
+kubectl taint nodes controlplane node-role.kubernetes.io/control-plane:NoSchedule -> taint the node
 
 NOTE:
 why no pod get schedule on the master node because while creating the cluster, the master nodes is tainted so no
@@ -511,15 +511,15 @@ affinity:
 
 what if the node does not have the matching node affinity, will the pods get schedule or not.
 
-node affinity is of three types:
+node affinity is of two types:
 
 1.requiredDuringSchedulingIgnoreDuringExecution - for this while creating the pod,pod must have matching label 
                                                   with the node then only it will schedule it on the node.
-                                                  after placing in the node then you removed or chnaged the labels
+                                                  after placing in the node then you removed or changed the labels
                                                   from node then it will not evict the pod. it will continue running in node.
 2.preferredDuringSchedulingIgnoreDuringExecution - for this while creating the pod, it will look for matching label
                                                    if it is not found then it will schedule on other nodes.
-                                                   after placing in the node then you removed or chnaged the labels
+                                                   after placing in the node then you removed or changed the labels
                                                   from node then it will not evict the pod. it will continue running in node.
 
 
@@ -551,12 +551,12 @@ in a namespace. LimitRange is applied to namespace only.
 
 DAEMONSETS:
 when you deploy the daemonset then it will run one copy of the pod in every node in cluster.
-daemonset sures that one copy of the pod runs in every node.
+daemonset ensures that one copy of the pod runs in every node.
 
 usecases:
 1. deploy the monitoring agents
 2. log collector
-3. we can deploy the kube-proxy as a daemonset, so that it will run on ever node in the cluster which actually
+3. we can deploy the kube-proxy as a daemonset, so that it will run on every node in the cluster which actually
    required for networking.
 
    daemonsets.yaml:
@@ -633,7 +633,7 @@ some Admission controller are 1.AlwaysPullImages
                               2.DefaultStorageClass
                               3.NamespaceExists and etc.
 
-if you want to create a pod and then that request is authentication and then authorization and then it will
+if you want to create a pod and then that request is authenticated and then authorized and then it will
 goes to the Admission controller, it will check namespace is present then it will create the pod else it will
 throw an error.
 
@@ -866,7 +866,7 @@ NOTE:
 after kubernetes version 1.23, HPA will comes with default, you don't need to install it.
 
 HPA will keep monitoring the metrics server for the cpu and memory utilization when it goes than mentioned
-then it automatically spin up the pod for you.
+then it automatically spin up the new pods for you.
 
 
 VPA(Vertical Pod Autoscaler):
@@ -1072,7 +1072,7 @@ By default, all the pods in the cluster can communicate each other. we can restr
 
 
  securing k8s the cluster access using Authentication:
- they are twi types of peoples are there 1. users to do the admin or deployment work
+ they are two types of peoples are there 1. users to do the admin or deployment work
                                          2. service account i.e you want to access the some service outside the k8s cluster.
 
 k8s does the manage the user management. it gives that to external providers like LDAP or certificates or files etc.
@@ -1283,7 +1283,7 @@ command to see the current kube-config information -> kubectl config view
 
 API GROUPS:
 
-These APIs are categorized into two;
+These APIs are categorized into two:
 1.the core group
 2.the named group.
 
@@ -1367,10 +1367,10 @@ you have created the role and rolebinding for a user and you want to check the a
 or not then use this command without authenticating(login) with the user:
 
 kubectl auth can-i create deployments --as dev-user i.e it prints no because in above we haven't given permissions for deployment.
-kubectl auth can=i create pods --as dev-user -> it prints yes because we have given permissions for pods.
+kubectl auth can-i create pods --as dev-user -> it prints yes because we have given permissions for pods.
 
 NOTE:
-we have give access to specific resource like instead of giving access to all pods, you can give access to 
+we have to give access to specific resource like instead of giving access to all pods, you can give access to 
 specific pods. add this below the verbs: resourceNames: ["nginx-pod","busybox-pod"]
 
 if you want to see the what Authorization mechanisms used for the cluster then describe the api-server, in the
@@ -1888,7 +1888,7 @@ Where is the configuration file located for configuring the CoreDNS service -> k
 
 
 Ingress:
-ngress in Kubernetes is an API object that manages external access to services within a cluster, typically 
+Ingress in Kubernetes is an API object that manages external access to services within a cluster, typically 
 HTTP and HTTPS traffic. It provides routing rules to expose services using a single entry point
 (like a domain name) and can handle features like load balancing, SSL termination, and path-based routing.
 
