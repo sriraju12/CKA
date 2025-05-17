@@ -1979,6 +1979,55 @@ inorder to implement Gateway API, the following things need to do:
 3. need to write the HTTPRoute yml i.e it Routes requests to backend services.
 
 
+PriorityClass:
+PriorityClass is a Kubernetes object that defines a priority value for pods. Pods with higher priority values are scheduled
+before those with lower ones when resources are scarce.
+
+priorityclass.yaml:
+
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: high-priority
+value: 1000000  # higher values mean higher priority.
+globalDefault: false  # if you keep as true then it will be the default priorityclass for all the pods. i.e  If true, this class is used for pods without a specified priorityClassName.
+description: "This priority class is for high-priority workloads."  # explaining usage.
+
+How to Use It in a Pod:
+
+* Once a PriorityClass is created, reference it in a pod spec
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: important-pod
+spec:
+  priorityClassName: high-priority
+  containers:
+    - name: nginx
+      image: nginx
+
+
+Preemption:
+Preemption allows higher-priority pods to evict lower-priority pods when the cluster lacks resources.
+
+Example:
+
+* Low-priority pod is running.
+* A high-priority pod is scheduled, but no node has enough resources.
+* Scheduler evicts one or more low-priority pods to make room.
+
+Preemption is enabled by default, but can be turned off at the pod level.
+
+  preemptionPolicy: Never  # Useful when you want a pod to be high-priority for scheduling but not evict others.
+
+  
+Commands:
+
+kubectl get priorityclass or pc -> to display priorityclass
+
+
+
 
 TROUBELSHOOTING:
 
