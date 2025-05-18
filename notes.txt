@@ -1971,12 +1971,75 @@ drawbacks of ingress:
 The above problems are resolved using gateway api.
 
 Gateway API:
-Gateway API is an official Kubernetes project focused on layer four and layer-seven routing.
+Gateway API is an official Kubernetes project focused on layer four and layer-seven routing. It is advanced version of Ingress
+
+* it supports all the Protocol like HTTP, HTTPS, TCP, UDP where as ingress suports only HTTP/HTTPS.
+* it also supports canary deployment as default i.e we can distribute the traffic to different services
+  such as 80% service 1 and 20% service 2. where as ingress does not support this.
+* it also supports different routing such as header, query, method based routing.  
+
 
 inorder to implement Gateway API, the following things need to do:
 1. need to deploy the gateway controller like nginx(it is just like ingress controller).
 2. need to write the gateway yml i.e it Defines entry point for external traffic.
-3. need to write the HTTPRoute yml i.e it Routes requests to backend services.
+3. need to write the HTTPROUTE yml i.e it Routes requests to backend services.
+
+NOTE:
+when we request something then it goes to the gateway and then based on the rules defined in the HTTPROUTE, it will redirect
+to the service and then to the pod.
+
+gateway class -> which is used to implement type of load balancer like nginx
+gateway -> it is the actual load balancer instance 
+HTTPROUTE -> routing rules for mapping traffic
+
+gatewayclass.yaml:
+
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: example-gatewayclass
+spec:
+  controllerName: example.com/gateway-controller
+
+
+gateway.yaml:
+
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: example-gateway
+  namespace: default
+spec:
+  gatewayClassName: example-gatewayclass
+  listeners:   # Defines how traffic will be accepted (protocol, port, etc.).
+  - name: http
+    protocol: HTTP
+    port: 80
+    allowedRoutes:  # Defines which routes are allowed to attach to this Gateway
+      namespaces:
+        from: All
+
+
+HTTPRoute.yaml:
+
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: example-route
+  namespace: default
+spec:
+  parentRefs:  # Refers to the Gateway this route should attach to
+  - name: example-gateway
+  rules:   # Defines the match criteria and the destination (i.e., which Service to forward traffic to)
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /
+    backendRefs:
+    - name: example-svc
+      port: 80
+
+
 
 
 PriorityClass:
