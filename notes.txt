@@ -50,7 +50,7 @@ ETCD API Server. The certificate files are available in the etcd-master at the f
 --key /etc/kubernetes/pki/etcd/server.key
 
 
-So for the commands I showed in the above to work you must specify the ETCDCTL API version and 
+So for the commands I showed in the previous video to work you must specify the ETCDCTL API version and 
 path to certificate files. Below is the final form:
 
 kubectl exec etcd-master -n kube-system -- sh -c "ETCDCTL_API=3 etcdctl get / --prefix --keys-only --limit=10 --cacert /etc/kubernetes/pki/etcd/ca.crt --cert /etc/kubernetes/pki/etcd/server.crt  --key /etc/kubernetes/pki/etcd/server.key" 
@@ -119,6 +119,8 @@ spec:
 
 it deploy it -> kubectl apply -f pod.yaml 
 it check more information about pod -> kubectl describe pod nginx-container
+k label pod pod_name surname=krishnamsetty -> it will add label to a pod
+k get po pod_name --show-labels -> it will show the labels 
 
 
 
@@ -156,6 +158,7 @@ spec:
       containers:
         - name: nginxapp
           image: nginx
+
 
 
 
@@ -365,7 +368,7 @@ kubectl create deployment --image=nginx nginx
 
 Generate Deployment YAML file (-o yaml). Don't create it(--dry-run)
 
-kubectl create deployment --image=nginx nginx --dry-run=client -o yaml >  deployment.yaml
+kubectl create deployment --image=nginx nginx --dry-run=client -o yaml > deployment.yaml
 
 Generate Deployment with 4 Replicas
 
@@ -427,6 +430,8 @@ if you created a pod with label app: app1 and tier: frontend then you can filter
 kubectl get all --selector env=prod --no-headers | wc -l  -> it will give count.
 kubectl get all --selector env=prod,bu=finance,tier=frontend
 
+to show labels on the pods -> kubectl get pod nginx(pod_name) --show-labels
+
 
 TAINTS AND TOLERATIONS:
 the bug and the person, if the bug wants to land on the person. the person is sprayed with foam(Taint) and the bug 
@@ -474,6 +479,7 @@ than expected then it can use them. to achieve this we need to use node selector
 first label the node and in the pod yml, container level we need include the field called nodeSelector: and mention the label.
 
 label name: kubectl label nodes node_name label_key=label_value.
+unlabel: kubectl label nodes node_name label_key-
 in pod:  nodeSelector:
            size: Large
 
@@ -814,7 +820,7 @@ volumes:   # This is a container image field
 
 NOTE:
 secrets are not encrypted but only encoded. anyone can extract the value from the encoded value from secret.
-implement RBAC for secret for security purposes
+implement RBAC for secrets for security purposes
 store secrets in external secret store providers like hashicorp, systems manager(AWS), azure vault(AZURE) etc for better practices.
 
 
@@ -891,7 +897,7 @@ when you deploy the vpa, three pods will be running in kube-system namespace the
 
  vpa.yml:
 
- apiVersion: autoscaling.k8s.io/v1
+apiVersion: autoscaling.k8s.io/v1
 kind: VerticalPodAutoscaler
 metadata:
   name: my-vpa
@@ -1483,8 +1489,22 @@ IMAGE SECURITY:
    imagePullSecrets:
      - name: name_of_the_secret. this is a container level field.
 
+POD SECURITY:
+pod security mainly consists of two types:
+1. security context
+2. linux capabilitiess
+
 
 SECURITY CONTEXT:
+it defines privilege and access control settings for pods and containers.
+
+the different security contexts are:
+* runAsUser -> user ID to run the process
+* runAsGroup -> group ID to run the process
+* runAsNonRoot -> ensures containers cannot run as root user
+* fsGroup -> group ID of file ownership
+* allowPrivilegeEscalation -> controls if process can gain privilege aceess
+
 in docker, by default the containers will run as root user and if you want to run with some userid then while 
 writing the docker file you can add USER 1010 or run docker command -> docker run --name nginx nginx --user 1010.
 
@@ -1499,9 +1519,120 @@ if you want this for container then add this:
 securityContext:  # this is a image level field
   runAsUser: 1010 
 
+Example:
+
+# Secure container configuration
+apiVersion: v1
+kind: Pod
+metadata:
+  name: secure-demo
+spec:
+  securityContext:          # Pod-level security context
+    runAsUser: 1000  # process id
+    runAsGroup: 3000  # group id of process
+    runAsNonRoot: true
+    fsGroup: 2000  # file ownership group
+  volumes:
+  - name: sec-ctx-vol
+    emptyDir: {}
+  containers:
+  - name: sec-ctx-demo
+    image: busybox:1.28
+    command: [ "sh", "-c", "sleep 1h" ]
+    volumeMounts:
+    - name: sec-ctx-vol
+      mountPath: /data/demo
+    securityContext:
+      runAsUser: 1000
+      runAsNonRoot: true
+      allowPrivilegeEscalation: false # Prevent privilege escalation
+      capabilities:  # this is for linux capabilities
+        drop:
+        - ALL
+
+
+Linux Capabilities:
+it defines what a container can do.
+
+Example:
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: secure-demo
+spec:
+  containers:
+  - name: app
+    image: nginx:alpine
+    securityContext:
+      capabilities:
+        add: ["NET_ADMIN", "SYS_TIME"]    # Add specific capabilities
+        drop: ["ALL"]                      # Drop all capabilities first 
+
 NOTE:
-if you mention securty context at pod level and container level then container level security context will override
-the pod level security context.
+* if you mention securty context at pod level and container level then container level security context will override
+  the pod level security context.
+
+* security context can be appplied at pod level or container level
+
+* linux capabilities can be applied at container level only.
+
+
+CRI-Dockerd Installation:
+
+Step 1: Verify Docker Installation
+
+     sudo systemctl status docker
+
+Step 2: Create Docker Group(optional if docker is setting up for the first time) 
+
+    sudo groupadd docker
+    sudo usermod -aG docker $USER
+    sudo usermod -aG docker root
+
+Step 3: Download CRI-Dockerd Package i.e in the exam they will provide this.
+
+   wget https://github.com/Mirantis/cri-dockerd/releases/download/v0.3.16/cri-dockerd_0.3.16.3-0.ubuntu-jammy_amd64.deb
+
+Step 4: Install CRI-Dockerd Package
+
+    sudo dpkg -i cri-dockerd_0.3.16.3-0.ubuntu-jammy_amd64.deb
+
+Step 5: Enable and Start CRI-Dockerd Service    
+
+    sudo systemctl enable --now cri-docker.service
+    sudo systemctl start cri-docker.service
+    sudo systemctl status cri-docker.service
+
+Step 6: Configure System Parameters   
+
+Configure the required kernel parameters for Kubernetes networking
+
+    # Create and configure kernel parameters
+      cat <<EOF | sudo tee /etc/sysctl.d/k8s.conf
+      net.bridge.bridge-nf-call-iptables  = 1
+      net.netfilter.nf_conntrack_max  = 131072
+      net.ipv6.conf.allforwarding = 1
+      net.ipv4.ip_forward                 = 1
+      EOF
+
+      # Apply sysctl params without reboot
+      sudo sysctl --system
+
+      # Reload systemd daemon
+      sudo systemctl daemon-reload
+
+Step 7: Verify CRI-Dockerd Installation
+
+    # Check CRI-Dockerd service status
+    sudo systemctl status cri-docker.service
+
+    # Check CRI-Dockerd socket status
+    sudo systemctl status cri-docker.socket
+
+    # View CRI-Dockerd logs
+    sudo journalctl -u cri-docker.service -f
+
 
 
 NETWORK POLICIES:
@@ -1798,7 +1929,7 @@ spec:
 if you have created, PV and PVC then you want to attach that PVC to a pod as volume then follow below:
 
 apiVersion: v1
-kind: Pod
+kind: Pod 
 metadata:
   name: mypod
 spec:
@@ -1968,6 +2099,7 @@ drawbacks of ingress:
    Does not support automatic wildcard certificates unless using a cert-manager. Certificate renewal requires
    manual updates unless integrated with Let's Encrypt.
 
+
 The above problems are resolved using gateway api.
 
 Gateway API:
@@ -2042,9 +2174,12 @@ spec:
 
 
 
+
+
+
 PriorityClass:
 PriorityClass is a Kubernetes object that defines a priority value for pods. Pods with higher priority values are scheduled
-before those with lower ones when resources are scarce.
+before those with lower ones when resources are low.
 
 priorityclass.yaml:
 
@@ -2088,8 +2223,6 @@ Preemption is enabled by default, but can be turned off at the pod level.
 Commands:
 
 kubectl get priorityclass or pc -> to display priorityclass
-
-
 
 
 TROUBELSHOOTING:
@@ -2170,29 +2303,5 @@ if you want to print the output in custom columns like
 
    -> kubectl get nodes -o=custom-columns=NodeName:.metadata.name,CPU:.status.capacity.cpu
 
-kubectl -n admin2406 get deployment -o custom columns=DEPLOYMENT:.metadata.name,CONTAINER_IMAGE:.spec.template.spec.containers[].image,READY_REPLICAS:.status.readyReplicas,NAMESPACE:.metadata.namespace --sort-by=.metadata.name > /opt/admin2406_data
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+kubectl -n admin2406 get deployment -o custom-columns=DEPLOYMENT:.metadata.name,CONTAINER_IMAGE:.spec.template.spec.containers[].image,READY_REPLICAS:.status.readyReplicas,NAMESPACE:.metadata.namespace --sort-by=.metadata.name > /opt/admin2406_data
 
