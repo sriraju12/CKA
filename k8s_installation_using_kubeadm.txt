@@ -7,19 +7,27 @@ Steps to install the k8s cluster using kubeadm:
    for that, first Download the public signing key for the Kubernetes package repositories:
    curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.32/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
 
+      link: https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/ -> point-2 in Installing kubeadm, kubelet and kubectl
+
    add the package repository:
    echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.32/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list
 
-   upgarde and download the kubeadm:
+      link: https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/ -> point-3 in Installing kubeadm, kubelet and kubectl
+
+   upgrade and download the kubeadm:
    sudo apt-get update
    sudo apt-get install -y kubelet kubeadm kubectl
    sudo apt-mark hold kubelet kubeadm kubectl
 
    to verify the version of kubeadm then run the command -> kubeadm version
 
+      link: https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/ -> point-4 in Installing kubeadm, kubelet and kubectl
+
 4. install the container runtime in master and worker nodes. i.e to run pod,we need container runtime.
    
       command -> sudo apt update && sudo apt install containerd -y
+
+      link: https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/ -> in Instructions and then in component installation and then click on container runtime   
 
 5. need to download the cgroup drivers. first we need to check what our VM is using for that run the below command.
    here cgroup drivers are used to constrain resources that are allocated to processes. i.e to set the resource
@@ -35,11 +43,15 @@ Steps to install the k8s cluster using kubeadm:
     run this command to set the cgroupdriver to systemd:
     containerd config default | sed 's/SystemdCgroup = false/SystemdCgroup = true/' | sudo tee /etc/containerd/config.toml
 
+      link: https://kubernetes.io/docs/setup/production-environment/container-runtimes/#containerd -> click on container runtime and then go to cdrivers
+
 6. restart containerd -> sudo systemctl restart containerd
 
 7. install the control plan components using kubeadm. command is below. i.e run the below command in only master node.
 
    sudo kudeadm init --apiserver-advertise-address 192.168.52.12(Node_IP) --pod-network-cidr "10.244.0.0/16" --upload-certs
+
+      link: https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/ -> under Initializing your control-plane node 
 
    here pod-network-cidr is used by pod to get ip address for it within this range. here upload-certs will upload 
    all the certificate to the secrets, so that all of the other nodes will have access to the certificates.
@@ -54,10 +66,12 @@ Steps to install the k8s cluster using kubeadm:
                  sudo chown $(id -u):$(id -g) $HOME/.kube/config
 
 9. run kubectl get nodes, it will display the master node and the status is pending because we haven't configure
-   the network plugin. the click on the addons in documentation it will show you supported network plugins.
-   choose whatever you want.
+   the network plugin. then click on the addons in documentation it will show you supported network plugins.
+   choose whatever you want.(run in master node only i.e it is automatically deploys networking solution to worker nodes)
 
    command -> kubectl apply -f https://docs.projectcalico.org/manifests/calico.yaml
+
+      link: https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/ -> go to Installing a Pod network add-on and then click on Installing Addons and then choose it.
 
    NOTE:
    the default pod networking range is 10.244.0.0/16, if you have used your own cidr range then in the calico.yaml
@@ -71,5 +85,21 @@ Steps to install the k8s cluster using kubeadm:
 
     
 
+overview:
+
+On Master Node:
+
+   install kubeadm
+   install containerd 
+   install master node components i.e apiserver etcd etc
+   install pod networking
+
+
+On Woker Nodes:   
+
+   install kubeadm
+   install containerd
+   install pod networking
+   join with master node
 
 
