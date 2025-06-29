@@ -1,0 +1,142 @@
+POD:
+
+kubectl get pod: List all pods in current namespace
+kubectl get pod -o wide: Detailed pod information with node details
+kubectl get pod -w: Watch live pod status updates
+kubectl get pod -o yaml: Export pod configuration in YAML format
+kubectl describe pod <pod_name>: Detailed pod status and events
+kubectl delete pod <pod_name>: Remove specific pod
+kubectl edit pod <pod_name>: Modify pod configuration live
+kubectl logs <pod_name>: View pod logs
+kubectl exec -it <pod_name> /bin/bash: Interactive shell inside pod
+kubectl get pods --show-labels: List pods with their labels
+kubectl get pods --field-selector=status.phase=Running: Filter running pods
+kubectl top pod: Resource usage metrics
+kubectl port-forward <pod_name> <local_port>:<pod_port>: Network port forwarding
+
+NODE:
+
+kubectl describe node <node_name>: Detailed node information and status
+kubectl get node <node_name>: Get basic node details
+kubectl get node <node_name> -o yaml: Export node configuration in YAML format
+kubectl drain node <node_name>: Prepare node for maintenance by evicting all pods
+kubectl cordon node <node_name>: Mark node as unschedulable for new pods
+kubectl uncordon node <node_name>: Mark node as schedulable again
+kubectl get nodes: List all cluster nodes
+kubectl top node: View node resource usage
+kubectl label node <node_name>: Add or modify node labels
+
+Object Creation Commands:
+
+Resource Creation:
+
+kubectl apply -f <file_name>.yaml: Create resource from YAML file
+kubectl apply -f <file1>.yaml -f <file2>.yaml: Create from multiple files
+kubectl apply -f ./<directory_name>: Create all files in directory
+kubectl apply -f https://<url>: Create from URL
+
+Pod Creation:
+
+kubectl run <pod_name> --image=<image_name>: Create basic pod
+kubectl run <pod_name> --image=<image_name> --port <port> --expose: Create pod and expose as service
+kubectl run <pod_name> --image=<image_name> --dry-run=client -o yaml > <file_name>.yaml: Generate Pod YAML file
+
+Deployment Creation:
+
+kubectl create deployment <name> --image=<image_name>: Createdeployment
+kubectl create deployment <name> --image=<image_name> --dry-run=client -o yaml > <file_name>.yaml: Generate Deployment YAML file
+
+ConfigMap Creation:
+
+kubectl create configmap <name> --from-literal=<key>=<value>:Create from key-value pairs
+kubectl create configmap <name> --from-file=<file_name>: Create from file
+kubectl create configmap <name> --from-env-file=<file_name>:Create from environment file
+
+Secret Creation:
+
+kubectl create secret generic <name> --from-literal=<key>=<value>:Create from key-value pairs
+kubectl create secret generic <name> --from-file=<file_name>: Create from file
+
+Monitoring Usage Commands:
+
+Node Resource Monitoring:
+
+kubectl top node: Display resource usage for all nodes
+kubectl top node <node_name>: Get specific node's CPU and memory utilization
+
+Pod Resource Monitoring:
+
+kubectl top pod: Display resource usage for all pods
+kubectl top pod <pod_name>: Get specific pod's CPU and memory utilization
+kubectl top pod -n <namespace>: View pod resources in specific namespace
+kubectl top pod --sort-by=cpu: Sort pods by CPU usage
+kubectl top pod --sort-by=memory: Sort pods by memory usage
+
+DEPLOYMENT:
+
+kubectl get deployment: List all deployments
+kubectl get deployment <deployment_name>: Get specific deployment
+kubectl get deployment <deployment_name> -o yaml: Get deploymentin YAML format
+kubectl get deployment <deployment_name> -o wide: Detailed deployment information
+kubectl edit deployment <deployment_name>: Modify deployment configuration
+kubectl describe deployment <deployment_name>: Detailed deployment status
+kubectl delete deployment <deployment_name>: Remove deployment
+kubectl scale deployment <deployment_name> --replicas=<number>:Change deployment replica count
+kubectl rollout restart deployment <deployment_name>: Restart deployment
+kubectl rollout undo deployment <deployment_name>: Undo to previous deployment revision
+kubectl rollout undo deployment <deployment_name> --to-revision=<revision_number>: Undo to specific deployment revision
+kubectl rollout history deployment <deployment_name>: View all deployment revisions
+kubectl rollout history deployment <deployment_name> --revision=<revision_number>: Get details of specific revision
+
+SERVICE:
+
+kubectl get service: List all services in current namespace
+kubectl get service <service_name>: Get specific service details
+kubectl get service <service_name> -o yaml: Get service in YAML format
+kubectl get service <service_name> -o wide: Detailed service information
+kubectl edit service <service_name>: Modify service configuration
+kubectl describe service <service_name>: Detailed service status
+kubectl delete service <service_name>: Remove service from cluster
+
+INGRESS:
+
+kubectl get ingress: List all ingresses in current namespace
+kubectl get ingress -o yaml: Get ingress in YAML format
+kubectl get ingress -o wide: Detailed ingress information
+kubectl edit ingress <ingress_name>: Modify ingress configuration
+kubectl describe ingress <ingress_name>: Detailed ingress status
+kubectl delete ingress <ingress_name>: Remove ingress from cluster
+
+Endpoints Commands:
+
+kubectl get endpoints: List all endpoints in current namespace
+kubectl get endpoints <endpoints_name>: Get specific endpoint details
+kubectl get endpoints -A: List endpoints across all namespaces
+
+DaemonSet:
+
+kubectl get daemonset: List all daemonsets in current namespace
+kubectl get daemonset <daemonset_name>: Get specific daemonset details
+kubectl get daemonset <daemonset_name> -o yaml: Get daemonset in YAML format
+kubectl edit daemonset <daemonset_name>: Modify daemonset configuration
+kubectl describe daemonset <daemonset_name>: Detailed daemonset status
+kubectl delete daemonset <daemonset_name>: Remove daemonset from cluster
+
+Job Commands:
+
+kubectl get job: List all jobs in current namespace
+kubectl get job <job_name>: Get specific job details
+kubectl get job <job_name> -o yaml: Get job in YAML format
+kubectl edit job <job_name>: Modify job configuration
+kubectl describe job <job_name>: Detailed job status
+kubectl delete job <job_name>: Remove job from cluster
+
+
+Secret Commands:
+
+kubectl get secret: List all secrets in current namespace
+kubectl get secret <secret_name>: Get specific secret details
+kubectl get secret <secret_name> -o yaml: Get secret in YAML format
+kubectl describe secret <secret_name>: Detailed secret information
+kubectl delete secret <secret_name>: Remove secret from cluster
+kubectl edit secret <secret_name>: Modify secret configuration
