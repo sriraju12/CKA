@@ -2401,5 +2401,54 @@ kubeadm join 192.168.233.162:6443 --token j7hnsg.oz15uyij7z2ov32w.svc.cluster.lo
 
 
 
+Troubleshooting:
+
+* Troubleshoot kube-scheduler: Scenario: CrashLoopBackOff
+
+  solution: k describe pod kube-scheduler-controlplane -n kube-system
+            Fix: Edit /etc/kubernetes/manifests/kube-scheduler.yaml.
+
+* Troubleshoot kubelet: Scenario: kubelet.service fails
+
+solution: systemctl status kubelet
+          journalctl -u kubelet -n 100
+          Fix: Check /var/lib/kubelet/config.yaml, CNI, CRI
+
+* Use crictl: Scenario: kubectl fails; check containers
+
+  solution: crictl ps # Running containers
+            crictl ps -a # All containers
+
+* Troubleshoot CoreDNS: Scenario: CrashLoopBackOff
+
+  solution: k get pods -n kube-system -l k8s-app=kube-dns
+            Fix SELinux:
+            k -n kube-system get deployment coredns -o yaml | sed 's/allowPrivilegeEscalation:
+            false/allowPrivilegeEscalation: true/g' | k apply -f -
+
+            Fix DNS:
+            k edit configmap coredns -n kube-system
+            # Replace: forward . /etc/resolv.conf
+            # With: forward . 8.8.8.8
+
+
+* troubleshoot kube-proxy: Scenario: Service connectivity
+
+  solution: k get pods -n kube-system -l k8s-app=kube-proxy
+            k logs -n kube-system kube-proxy-<hash> 
+            netstat -plan | grep kube-proxy
+
+NOTE:
+
+* Use crictl ps -a when kubectl fails
+
+Plugins:
+* Flannel: Overlay, no policies.
+* Weave: Overlay, policies.
+* Calico: Policies, routing.
+
+Check /etc/cni/net.d/ -> to check which plugin is using.
+
+
 
 
