@@ -1994,6 +1994,12 @@ in pending state only because it is not attached to the pod. if you attach to it
 * Only One Default StorageClass Allowed. If another StorageClass is already default, you must remove its default status first before setting a
 new one.
 
+* Required Annotation
+  The exact annotation must be used:
+  metadata:
+  annotations:
+  storageclass.kubernetes.io/is-default-class: "true"
+
 
 NETWORKING:
 
