@@ -2325,3 +2325,81 @@ NOTE:
 k get crd -o name > ~/resources.yaml
 k explain Certificate.spec.subject > ~/subject.yaml
 
+
+Design and Install HA(High Available) Cluster:
+
+* HA Setup: 3+ control plane nodes, load balancer (6443), external/stacked etcd.
+• Networking: PodCIDR (e.g., 172.17.0.0/16), ServiceCIDR (e.g., 172.20.0.0/16), CNI.
+• Node Specs: 2 CPU, 4GB RAM for control plane.
+
+
+Steps: Configure kernel, install tools, initialize, join nodes, deploy CNI.
+
+Enable bridge networking:
+
+cat <<EOF | sudo tee /etc/modules-load.d/k8s.conf
+br_netfilter
+EOF
+cat <<EOF | sudo tee /etc/sysctl.d/k8s.conf
+net.bridge.bridge-nf-call-ip6tables = 1
+net.bridge.bridge-nf-call-iptables = 1
+EOF
+
+sudo sysctl --system
+
+Install Tools:
+
+sudo apt-get update
+sudo apt-get install -y apt-transport-https ca-certificates curl
+curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.32/deb/Release.key | sudo gpg --dearmor -
+o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg]
+https://pkgs.k8s.io/core:/stable:/v1.32/deb/ /' | sudo tee
+/etc/apt/sources.list.d/kubernetes.list
+sudo apt-get update
+sudo apt-get install -y kubelet=1.32.0-1.1 kubeadm=1.32.0-1.1 kubectl=1.32.0-1.1
+sudo apt-mark hold kubelet kubeadm kubectl
+
+Initialize Cluster:
+
+kubeadm init --apiserver-advertise-address 192.168.233.162 --apiserver-cert-extra-
+sans=controlplane \
+--pod-network-cidr 172.17.0.0/16 --service-cidr 172.20.0.0/16
+
+mkdir -p $HOME/.kube
+sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+Install Flannel:
+
+curl -LO https://raw.githubusercontent.com/flannel-io/flannel/v0.20.2/Documentation/kube-
+flannel.yml
+
+Update net-conf.json:
+
+net-conf.json: |
+{
+"Network": "172.17.0.0/16",
+"Backend": {
+"Type": "vxlan"
+}
+}
+
+Add args:
+args:
+- --ip-masq
+- --kube-subnet-mgr
+- --iface=eth0  # this needs to be added
+
+kubectl apply -f kube-flannel.yml
+
+Join Worker:
+
+kubeadm join 192.168.233.162:6443 --token j7hnsg.oz15uyij7z2ov32w.svc.cluster.local \
+--discovery-token-ca-cert-hash sha256:f6723a96e698822d9986929945dbeda2c
+
+
+
+
+
+
