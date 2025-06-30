@@ -2000,6 +2000,11 @@ new one.
   annotations:
   storageclass.kubernetes.io/is-default-class: "true"
 
+* Removing Default Status
+  If you need to remove the default status (e.g., to set a new default):
+  kubectl patch storageclass <current-default> -p '{"metadata":
+  {"annotations":{"storageclass.kubernetes.io/is-default-class":"false"}}}'
+
 
 NETWORKING:
 
