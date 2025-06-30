@@ -1991,6 +1991,9 @@ NOTE:
 if you use VolumeBindingMode as WaitForFirstConsumer then if you create StorageClass and PVC then the PVC is still
 in pending state only because it is not attached to the pod. if you attach to it then the status is changed to bound.
 
+* Only One Default StorageClass Allowed. If another StorageClass is already default, you must remove its default status first before setting a
+new one.
+
 
 NETWORKING:
 
