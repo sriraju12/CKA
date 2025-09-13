@@ -105,6 +105,29 @@ if you don't want to use the built-in transformers for changing such as namePref
 here base folder is same and in dev folder, for example to change the replicas count then create the replicas.yaml file. here name is anything and then
 copy the base deployement yaml file upto replicas and then paste it in replicas.yaml and create the Kustomization. in that mention apiVersion, kind, and also mention patches: inside it - path: mention path of the replicas yaml file that's it.
 
+dev/replica-patch.yaml:
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app
+spec:
+  replicas: 1
+
+dev/kustomization.yaml:
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+- ../base
+patches:
+- path: replica-patch.yaml
+  target:
+    kind: Deployment
+    name: my-app
+
+
+
 Note:
 whenever you don't want use in-built transformers, then just copy base yaml file upto the field where you want to make changes and then
 create yaml file with some name and paste it. Then write Kustomization yaml file mention patches and inside it mention the path where that yaml file is present that's it.
