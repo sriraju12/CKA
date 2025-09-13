@@ -27,14 +27,71 @@ first we need to create one folder which is base, In this folder we need write a
 we will create the different folder like dev,staging and prod. cd into that folder and then again create the Kustomization.yml file because previously we have created that for which resources needs Kustomization and then this is for specific to this namespace.
 in that Kustomization, mention apiVersion, kind as Kustomization and then resources and in resources mention where the base deployement yaml file is present. and also write the transformers which is namePrefix: dev-. This will deploy the deployement with name dev-name of the deployment that we have mention in deployement yaml.
 
+Directory Structure:
+
+.
+├── base
+│   ├── deployment.yaml
+│   └── kustomization.yaml
+└── dev
+    └── kustomization.yaml
+
+
+base/deployment.yaml:
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: my-app
+  template:
+    metadata:
+      labels:
+        app: my-app
+    spec:
+      containers:
+      - name: my-app-container
+        image: nginx:latest
+
+
+Base kustomization.yaml:
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+- deployment.yaml
+
 if you want to run this, first you need to load the base folder so that kubernetes understand that use this deployment file as reference.
 first run this -> kubectl kustomize base -> it will print the deployement file.
 then run -> kubectl kustomize dev  -> it will print the deployment yaml file with new changes i.e it changes the name of the deployement
 By using this you can easily deploy the deployement into different namespaces with different names.
 
+
+Example:
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namePrefix: dev-
+resources:
+- ../base
+
 Just now we have seen how to change the name of the deployement yaml file, now let's see how to change the image of the deployement yaml file.
 in the dev Kustomization yaml file, just mention images and inside images mention name of the existing image and then newName: here mention new image name and then newTag: here mention tag of the new image that's it.
 While running it, first reload the base folder and then run it.
+
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+- ../base
+images:
+- name: nginx
+  newName: your-repo/my-app-image
+  newTag: "v1.2.0-dev"
 
 The Advantages of using Kustomization in kubernetes:
 
